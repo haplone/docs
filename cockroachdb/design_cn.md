@@ -37,7 +37,7 @@ facilitates quick repair and rebalancing to address node failures, new capacity
 and even read/write load. However, the size must be balanced against the
 pressure on the system from having more ranges to manage.
 
-KV映射在逻辑上由称为ranges的keyspace的较小片段组成。 每个range都由存储在本地KV存储引擎中[RocksDB]（http://rocksdb.org/）中（这是一个[LevelDB]（https://github.com/google/leveldb）类似的实现）。 range数据被复制到一定数量（可配置）的CockroachDB节点。 ranges合并和分割以保持目标大小，默认为`64M`。 相对较小的尺寸有助于快速修复和重新平衡以解决节点故障和新容量问题甚至读写负载。 但是，尺寸必须与其平衡系统受到更多rangs的管理压力。
+KV映射在逻辑上由称为ranges的keyspace的较小片段组成。 每个range都由存储在本地KV存储引擎 [RocksDB](http://rocksdb.org/)中，这是一个类似 [LevelDB](https://github.com/google/leveldb)的实现。 range数据被复制到一定数量（可配置）的CockroachDB节点。 ranges合并和分割以保持目标大小，默认为`64M`。 相对较小的尺寸有助于快速修复和重新平衡以解决节点故障和新容量问题甚至读写负载。 但是，尺寸必须与其平衡系统受到更多rangs的管理压力。
 
 CockroachDB achieves horizontally scalability:
 - adding more nodes increases the capacity of the cluster by the
@@ -66,16 +66,10 @@ CockroachDB achieves strong consistency:
   transactions for ACID semantics. CockroachDB uses an efficient
   **non-locking distributed commit** protocol.
 
-蟑螂数据库实现了强一致性：
-- 使用分布式一致性协议进行同步复制
-   数据在每个关键值范围内。 我们选择使用[筏
-   共识算法]（https://raftconsensus.github.io）; 所有的共识
-   状态存储在RocksDB中。
-- 单个或批次突变到一个单一的范围是通过介导的
-   范围的筏实例。 Raft保证ACID语义。
-- 影响多个范围的逻辑突变采用分布式
-   ACID语义的事务。 蟑螂数据库使用高效的
-   **非锁定分布式提交**协议。
+CockroachDB实现了强一致性：
+- 同步range中数据副本时使用分布式一致性协议。我们选择使用[raft共识算法]（https://raftconsensus.github.io）; 所有的共识状态存储在RocksDB中。
+- 对range的单个或批量修改通过range的raft实例实现。Raft保证ACID语义。
+- 影响多个range的逻辑修改采用ACID语义的分布式事务。 CockroachDB使用高效的**non-locking distributed commit**协议。
 
 
 CockroachDB achieves survivability:
@@ -89,6 +83,14 @@ CockroachDB achieves survivability:
   Japan }`, `{ Ireland, US-East, US-West}`, `{ Ireland, US-East,
   US-West, Japan, Australia }`).
 
+蟑螂数据库实现了高可用：
+- range的副本放在同一个数据中心，可以实现低延迟复制，容忍磁盘和机器故障。他们能分布在机架上以容忍一些网络交换机故障。
+- range的副本可以放在多个的数据中心，可以容忍更多的失败场景，像数据中心电力或网络损失、区域性电力故障
+   （例如， `{ US-East-1a, US-East-1b, US-East-1c }`, `{ US-East, US-West,
+   Japan }`, `{ Ireland, US-East, US-West}`, `{ Ireland, US-East,
+   US-West, Japan, Australia }`）。
+
+
 CockroachDB provides [snapshot
 isolation](http://en.wikipedia.org/wiki/Snapshot_isolation) (SI) and
 serializable snapshot isolation (SSI) semantics, allowing **externally
@@ -101,6 +103,9 @@ performance. CockroachDB implements [a limited form of linearizability
 ](#strict-serializability-linearizability), providing ordering for any
 observer or chain of observers.
 
+CockroachDB提供[快照隔离snapshot isolation](http://en.wikipedia.org/wiki/Snapshot_isolation)（SI）和 可串行快照隔离serializable snapshot isolation（SSI）语义，允许外部使用**一致的，无锁读取和写入** -- 都来自历史快照时间戳和当前挂钟时间。 SI提供无锁读取并写入但仍允许写入歪斜write skew。 SSI消除了写入歪斜，但是在引起争议的系统中引入性能问题。 SSI是默认隔离机制; 客户端必须地明确指定以正确性换取
+性能。 CockroachDB实现了[线性化的一种有限形式]（＃strict-serializability-linearizability），为任何提供排序观察员或观察员链。
+
 Similar to
 [Spanner](http://static.googleusercontent.com/media/research.google.com/en/us/archive/spanner-osdi2012.pdf)
 directories, CockroachDB allows configuration of arbitrary zones of data.
@@ -108,6 +113,8 @@ This allows replication factor, storage device type, and/or datacenter
 location to be chosen to optimize performance and/or availability.
 Unlike Spanner, zones are monolithic and don’t allow movement of fine
 grained data on the level of entity groups.
+
+如同[spanner](http://static.googleusercontent.com/media/research.google.com/en/us/archive/spanner-osdi2012.pdf)目录，CockroachDB允许配置任意数据zones。这允许复制因子，存储设备类型和/或数据中心选择位置以优化性能和/或可用性。与spanner不同，zones是单片的，不允许移动有关实体组织级别的数据。
 
 # Architecture
 
@@ -122,6 +129,9 @@ of a single, monolithic key value store. The distributed KV store
 communicates with any number of physical cockroach nodes. Each node
 contains one or more stores, one per physical device.
 
+CockroachDB实现了分层架构。 最高级别的抽象是SQL层（在本文档中没有细说）。熟悉的关系概念如模式，表格，列和索引直接取决于[* SQL layer*](＃sql)。 SQL层依次依赖[分布式key value存储]()＃key-value-api)，它处理范围寻址的细节以提供抽象一个单一的key value存储store。 分布式KV存储与任何数量的物理CockroachDB节点进行通信。 每个节点包含一个或多个store，每个物理设备一个。
+
+
 ![Architecture](media/architecture.png)
 
 Each store contains potentially many ranges, the lowest-level unit of
@@ -129,6 +139,8 @@ key-value data. Ranges are replicated using the Raft consensus protocol.
 The diagram below is a blown up version of stores from four of the five
 nodes in the previous diagram. Each range is replicated three ways using
 raft. The color coding shows associated range replicas.
+
+每个store可以有很多个range，key value数据的最低层单位。 range使用Raft共识协议复制。下面的图表显示上面图中五个store中四个store中节点的细节。 每个range使用raft复制3份。 颜色代码显示相关的range副本。
 
 ![Ranges](media/ranges.png)
 
@@ -138,6 +150,8 @@ operational features). Both services accept batches of requests and
 return batches of responses. Nodes are symmetric in capabilities and
 exported interfaces; each has the same binary and may assume any
 role.
+
+每个物理节点暴露两个基于RPC的key value API：一个用于外部客户端和一个内部客户端（暴露敏感操作功能）。 这两个服务都可以接受批量的请求并返回一批响应。 节点在功能和暴露接口方面是一样的; 每个都有相同的二进制，并可能会假设任何角色。
 
 Nodes and the ranges they provide access to can be arranged with various
 physical network topologies to make trade offs between reliability and
@@ -149,7 +163,17 @@ each replica located on different:
 -   servers on different racks within a datacenter to tolerate rack power/network failures.
 -   servers in different datacenters to tolerate large scale network or power outages.
 
+nodes和ranges可以通过不同的网络拓扑访问，以平衡可靠性和性能。 例如，一个三重复制（3路复制）range可能有
+位于不同的位置副本：
+
+- 服务器内的磁盘，容忍磁盘故障。
+- 机架内的服务器，可以容忍服务器故障。
+- 数据中心内不同机架上的服务器，可以容忍机架电源/网络故障。
+- 位于不同数据中心的服务器，可以容忍大规模网络或停电。
+
 Up to `F` failures can be tolerated, where the total number of replicas `N = 2F + 1` (e.g. with 3x replication, one failure can be tolerated; with 5x replication, two failures, and so on).
+
+在'N = 2F + 1'的副本总数中（例如3x复制，一个故障可以容忍; 5x复制，两个故障等等），可以容忍高达'F'个副本故障。
 
 # Keys
 
@@ -159,6 +183,8 @@ internal data structures and metadata. Table data keys contain SQL
 table data (as well as index data). System and table data keys are
 prefixed in such a way that all system keys sort before any table data
 keys.
+
+cockroach 的 key 是任意字节数组。 key有两种类型：系统key和表数据key。 系统key由Cockroach用于内部数据结构和元数据。 表数据key包含SQL表数据（以及索引数据）。 系统和表格数据key都有前缀，以保障系统key会排序在表数据key之前。
 
 System keys come in several subtypes:
 
@@ -183,10 +209,19 @@ System keys come in several subtypes:
     local to a replica. The primary examples of such keys are the Raft
     state and Raft log.
 
+- **Gloal** 键存储集群范围的数据，如“meta1”和“meta2”key以及各种其他系统级key，例如节点和商店ID分配器。
+- **store local** key用于未复制的store元数据（例如`StoreIdent`结构）。 “Unreplicated”表示这些值不会跨多个store复制，因为他们持有的数据与目前store的生命周期相关。
+- **range local** 存储range元数据的key与global key相关。range local keys有一个特殊的前缀，后跟一个global key和特殊后缀。例如，事物记录是range local key，如下所示：`\ x01k <全局密钥> txn- <txnID>`。
+- **Replicated Range ID local** 全部副本上都有的存储range 元数据的key 在range。这些key通过Raft操作更新。例子包括range租约状态和中止缓存条目。
+- **Unreplicated Range ID local** 只在本地副本有的存储range元数据的key。这种eky的主要例子是raft状态和raft日志。
+
 Table data keys are used to store all SQL data. Table data keys
 contain internal structure as described in the section on [mapping
 data between the SQL model and
 KV](#data-mapping-between-the-sql-model-and-kv).
+
+表数据key用于存储所有SQL数据。 表数据key包含内部结构在[SQL模型与KV映射数据 mapping data between the SQL model and KV](#data-mapping-between-the-sql-model-and-kv)中介绍。
+
 
 # Versioned Values
 
