@@ -1,0 +1,19 @@
+JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk1.8.0_161.jdk/Contents/Home/
+CLASSPAHT=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+
+PATH=$JAVA_HOME/bin:$PATH:
+
+export JAVA_HOME
+
+export CLASSPATH
+
+export PATH
+
+SCALA_HOME=/data/app/scala
+export PATH=$SCALA_HOME/bin:$PATH
+
+MAVEN_HOME=/data/app/maven
+export PATH=$MAVEN_HOME/bin:$PATH
+
+export GOROOT=/usr/local/go
+export GOPATH=/data/code/golang
