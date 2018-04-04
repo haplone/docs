@@ -2,6 +2,9 @@
 This document is an updated version of the original design documents
 by Spencer Kimball from early 2014.
 
+本文档是由Spencer Kimball从2014年初开始编写的原始设计文档的更新版本。
+
+
 # Overview
 
 CockroachDB is a distributed SQL database. The primary design goals
@@ -12,6 +15,8 @@ manual intervention**. CockroachDB nodes are symmetric; a design goal is
 **homogeneous deployment** (one binary) with minimal configuration and
 no required external dependencies.
 
+CockroachDB是一个分布式SQL数据库。 主要设计目标是**可扩展性**，**强一致性**和**生存能力**（由此得名）。 蟑螂数据库旨在容忍磁盘，机器，机架和甚至是**数据中心故障**，延迟时间最短，而且不需要人工干预**。CockroachDB节点是对称的; 设计目标是**同构部署**（一个二进制），最小配置，没有需要的外部依赖。
+
 The entry point for database clients is the SQL interface. Every node
 in a CockroachDB cluster can act as a client SQL gateway. A SQL
 gateway transforms and executes client SQL statements to key-value
@@ -19,6 +24,8 @@ gateway transforms and executes client SQL statements to key-value
 necessary and returns results to the client. CockroachDB implements a
 **single, monolithic sorted map** from key to value where both keys
 and values are byte strings.
+
+数据库客户端的入口点是SQL接口。 CockroachDB集群中的每个节点都可以充当客户端SQL网关(gateway)。 一个SQL网关(gateway)将客户端SQL语句转换并执行key-value（KV）操作，并根据需要在集群中分配这些操作,将结果返回给客户。 CockroachDB实现了一个**单一，整体排序的映射**从key到value映射，而且都是字节字符串。
 
 The KV map is logically composed of smaller segments of the keyspace called
 ranges. Each range is backed by data stored in a local KV storage engine (we
@@ -29,6 +36,8 @@ split to maintain a target size, by default `64M`. The relatively small size
 facilitates quick repair and rebalancing to address node failures, new capacity
 and even read/write load. However, the size must be balanced against the
 pressure on the system from having more ranges to manage.
+
+KV映射在逻辑上由称为ranges的keyspace的较小片段组成。 每个range都由存储在本地KV存储引擎中[RocksDB]（http://rocksdb.org/）中（这是一个[LevelDB]（https://github.com/google/leveldb）类似的实现）。 range数据被复制到一定数量（可配置）的CockroachDB节点。 ranges合并和分割以保持目标大小，默认为`64M`。 相对较小的尺寸有助于快速修复和重新平衡以解决节点故障和新容量问题甚至读写负载。 但是，尺寸必须与其平衡系统受到更多rangs的管理压力。
 
 CockroachDB achieves horizontally scalability:
 - adding more nodes increases the capacity of the cluster by the
@@ -41,6 +50,11 @@ CockroachDB achieves horizontally scalability:
 - queries are distributed (ref: distributed SQL) so that the overall
   throughput of single queries can be increased by adding more nodes.
 
+CockroachDB实现了横向扩展性：
+- 通过添加更多节点可增加群集的容量。每个节点上的存储量（除以可配置的复制因子replication factor），理论上高达4艾字节（4E）的逻辑数据;
+- 客户端查询可以发送到集群中的任何节点，并可以独立查询（没有冲突），这意味着整体吞吐量与群集中节点数量的线性关系。
+- 查询分发（参考：分布式SQL），通过增加更多的节点来增加整体查询的吞吐量。
+
 CockroachDB achieves strong consistency:
 - uses a distributed consensus protocol for synchronous replication of
   data in each key value range. We’ve chosen to use the [Raft
@@ -51,6 +65,18 @@ CockroachDB achieves strong consistency:
 - logical mutations which affect multiple ranges employ distributed
   transactions for ACID semantics. CockroachDB uses an efficient
   **non-locking distributed commit** protocol.
+
+蟑螂数据库实现了强一致性：
+- 使用分布式一致性协议进行同步复制
+   数据在每个关键值范围内。 我们选择使用[筏
+   共识算法]（https://raftconsensus.github.io）; 所有的共识
+   状态存储在RocksDB中。
+- 单个或批次突变到一个单一的范围是通过介导的
+   范围的筏实例。 Raft保证ACID语义。
+- 影响多个范围的逻辑突变采用分布式
+   ACID语义的事务。 蟑螂数据库使用高效的
+   **非锁定分布式提交**协议。
+
 
 CockroachDB achieves survivability:
 - range replicas can be co-located within a single datacenter for low
