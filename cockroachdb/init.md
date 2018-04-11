@@ -93,6 +93,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 
 ```go
+
+这边概念很多，暂时先贴代码，后续需要细化概念
 // server/server.go
 // NewServer creates a Server from a server.Config.
 func NewServer(cfg Config, stopper *stop.Stopper) (*Server, error) {
@@ -102,7 +104,7 @@ func NewServer(cfg Config, stopper *stop.Stopper) (*Server, error) {
 	}
 	// ... 带拦截器的grpc
 	s.grpc = rpc.NewServerWithInterceptor(s.rpcContext, s.Intercept())
-	
+
 	// gossip相关初始化
 	s.gossip = gossip.New(
 		// ...
