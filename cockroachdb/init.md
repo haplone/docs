@@ -52,9 +52,20 @@ uninitialized, specify the --join flag to point to any healthy node
 
 # 启动server
 
+启动server主要做了3方面的工作：
 * 一堆的参数检查设置、log准备
 * new 一个server
 * 启动server
+
+
+这边的写法跟之前spring的做法有点相似，实例的初始化跟使用通过不同的模块提供。
+但没有搞懂new start在这边业务逻辑上严谨的区别。
+
+需要学习的三个知识点：
+* opentracing
+* stopper 
+* grpc
+
 
 ```go
 // cli/start.go
@@ -91,10 +102,9 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 # new server
 
+这边概念很多，暂时先贴代码，后续需要细化概念
 
 ```go
-
-这边概念很多，暂时先贴代码，后续需要细化概念
 // server/server.go
 // NewServer creates a Server from a server.Config.
 func NewServer(cfg Config, stopper *stop.Stopper) (*Server, error) {
@@ -142,6 +152,7 @@ func NewServer(cfg Config, stopper *stop.Stopper) (*Server, error) {
 
 	// creates a new engine for DistSQL processors to use when the
 	// working set is larger than can be stored in memory
+	// 这就是我们在数据目录里看到2.0多出来的rocksdb
 	tempEngine, err := engine.NewTempEngine(s.cfg.TempStorageConfig)
 	// 应用关闭时的回调注册
 	s.stopper.AddCloser(tempEngine)
@@ -243,52 +254,11 @@ func NewServer(cfg Config, stopper *stop.Stopper) (*Server, error) {
 func (s *Server) Start(ctx context.Context) error {
 	httpServer := netutil.MakeServer(s.stopper, tlsConfig, s)
 
-	// The following code is a specialization of util/net.go's ListenAndServe
-	// which adds pgwire support. A single port is used to serve all protocols
-	// (pg, http, h2) via the following construction:
-	//
-	// non-TLS case:
-	// net.Listen -> cmux.New
-	//               |
-	//               -  -> pgwire.Match -> pgwire.Server.ServeConn
-	//               -  -> cmux.Any -> grpc.(*Server).Serve
-	//
-	// TLS case:
-	// net.Listen -> cmux.New
-	//               |
-	//               -  -> pgwire.Match -> pgwire.Server.ServeConn
-	//               -  -> cmux.Any -> grpc.(*Server).Serve
-	//
-	// Note that the difference between the TLS and non-TLS cases exists due to
-	// Go's lack of an h2c (HTTP2 Clear Text) implementation. See inline comments
-	// in util.ListenAndServe for an explanation of how h2c is implemented there
-	// and here.
-
 	ln, err := net.Listen("tcp", s.cfg.Addr)
-	unresolvedListenAddr, err := officialAddr(ctx, s.cfg.Addr, ln.Addr(), os.Hostname)
-	s.cfg.Addr = unresolvedListenAddr.String()
-	unresolvedAdvertAddr, err := officialAddr(ctx, s.cfg.AdvertiseAddr, ln.Addr(), os.Hostname)
-	s.cfg.AdvertiseAddr = unresolvedAdvertAddr.String()
 
 	s.rpcContext.SetLocalInternalServer(s.node)
 
-	// The cmux matches don't shut down properly unless serve is called on the
-	// cmux at some point. Use serveOnMux to ensure it's called during shutdown
-	// if we wouldn't otherwise reach the point where we start serving on it.
-	var serveOnMux sync.Once
-	m := cmux.New(ln)
-
-	pgL := m.Match(func(r io.Reader) bool {
-		return pgwire.Match(r)
-	})
-
-	anyL := m.Match(cmux.Any())
-
 	httpLn, err := net.Listen("tcp", s.cfg.HTTPAddr)
-	unresolvedHTTPAddr, err := officialAddr(ctx, s.cfg.HTTPAddr, httpLn.Addr(), os.Hostname)
-	s.cfg.HTTPAddr = unresolvedHTTPAddr.String()
-
-	workersCtx := s.AnnotateCtx(context.Background())
 
 	s.stopper.RunWorker(workersCtx, func(workersCtx context.Context) {
 		<-s.stopper.ShouldQuiesce()
@@ -301,76 +271,15 @@ func (s *Server) Start(ctx context.Context) error {
 		// ...
 	}
 
+	// 这边有很多的stopper回调事件注册
 	s.stopper.RunWorker(workersCtx, func(context.Context) {
-		netutil.FatalIfUnexpected(httpServer.Serve(httpLn))
+		// ... 
 	})
-
-	s.stopper.RunWorker(workersCtx, func(context.Context) {
-		<-s.stopper.ShouldQuiesce()
-		// TODO(bdarnell): Do we need to also close the other listeners?
-		netutil.FatalIfUnexpected(anyL.Close())
-		<-s.stopper.ShouldStop()
-		s.grpc.Stop()
-		serveOnMux.Do(func() {
-			// A cmux can't gracefully shut down without Serve being called on it.
-			netutil.FatalIfUnexpected(m.Serve())
-		})
-	})
-
-	s.stopper.RunWorker(workersCtx, func(context.Context) {
-		netutil.FatalIfUnexpected(s.grpc.Serve(anyL))
-	})
-
-	// Running the SQL migrations safely requires that we aren't serving SQL
-	// requests at the same time -- to ensure that, block the serving of SQL
-	// traffic until the migrations are done, as indicated by this channel.
-	serveSQL := make(chan bool)
-
-	tcpKeepAlive := envutil.EnvOrDefaultDuration("COCKROACH_SQL_TCP_KEEP_ALIVE", time.Minute)
-	var loggedKeepAliveStatus int32
 
 	// Attempt to set TCP keep-alive on connection. Don't fail on errors.
 	setTCPKeepAlive := func(ctx context.Context, conn net.Conn) {
-		if tcpKeepAlive == 0 {
-			return
-		}
-
-		muxConn, ok := conn.(*cmux.MuxConn)
-		if !ok {
-			return
-		}
-		tcpConn, ok := muxConn.Conn.(*net.TCPConn)
-		if !ok {
-			return
-		}
-
-		// Only log success/failure once.
-		doLog := atomic.CompareAndSwapInt32(&loggedKeepAliveStatus, 0, 1)
-		if err := tcpConn.SetKeepAlive(true); err != nil {
-			if doLog {
-				log.Warningf(ctx, "failed to enable TCP keep-alive for pgwire: %v", err)
-			}
-			return
-
-		}
-		if err := tcpConn.SetKeepAlivePeriod(tcpKeepAlive); err != nil {
-			if doLog {
-				log.Warningf(ctx, "failed to set TCP keep-alive duration for pgwire: %v", err)
-			}
-			return
-		}
-
-		if doLog {
-			log.VEventf(ctx, 2, "setting TCP keep-alive to %s for pgwire", tcpKeepAlive)
-		}
+		// ...
 	}
-
-	// Enable the debug endpoints first to provide an earlier window into what's
-	// going on with the node in advance of exporting node functionality.
-	//
-	// TODO(marc): when cookie-based authentication exists, apply it to all web
-	// endpoints.
-	s.mux.Handle(debug.Endpoint, debug.NewServer(s.st))
 
 	// Also throw the landing page in there. It won't work well, but it's better than a 404.
 	// The remaining endpoints will be opened late, when we're sure that the subsystems they
@@ -397,53 +306,9 @@ func (s *Server) Start(ctx context.Context) error {
 		gwruntime.WithMarshalerOption(httputil.AltProtoContentType, protopb),
 		gwruntime.WithOutgoingHeaderMatcher(authenticationHeaderMatcher),
 	)
-	gwCtx, gwCancel := context.WithCancel(s.AnnotateCtx(context.Background()))
-	s.stopper.AddCloser(stop.CloserFn(gwCancel))
-
-	var authHandler http.Handler = gwMux
-	if s.cfg.RequireWebSession() {
-		authHandler = newAuthenticationMux(s.authentication, authHandler)
-	}
 
 	// Setup HTTP<->gRPC handlers.
 	c1, c2 := net.Pipe()
-
-	s.stopper.RunWorker(workersCtx, func(workersCtx context.Context) {
-		<-s.stopper.ShouldQuiesce()
-		for _, c := range []net.Conn{c1, c2} {
-			if err := c.Close(); err != nil {
-				log.Fatal(workersCtx, err)
-			}
-		}
-	})
-
-	s.stopper.RunWorker(workersCtx, func(context.Context) {
-		netutil.FatalIfUnexpected(s.grpc.Serve(&singleListener{
-			conn: c1,
-		}))
-	})
-
-	// Eschew `(*rpc.Context).GRPCDial` to avoid unnecessary moving parts on the
-	// uniquely in-process connection.
-	dialOpts, err := s.rpcContext.GRPCDialOptions()
-	if err != nil {
-		return err
-	}
-	conn, err := grpc.DialContext(ctx, s.cfg.AdvertiseAddr, append(
-		dialOpts,
-		grpc.WithDialer(func(string, time.Duration) (net.Conn, error) {
-			return c2, nil
-		}),
-	)...)
-	if err != nil {
-		return err
-	}
-	s.stopper.RunWorker(workersCtx, func(workersCtx context.Context) {
-		<-s.stopper.ShouldQuiesce()
-		if err := conn.Close(); err != nil {
-			log.Fatal(workersCtx, err)
-		}
-	})
 
 	for _, gw := range []grpcGatewayServer{s.admin, s.status, s.authentication, &s.tsServer} {
 		if err := gw.RegisterGateway(gwCtx, gwMux, conn); err != nil {
@@ -451,24 +316,16 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}
 	s.mux.Handle("/health", gwMux)
-	// bigboss here
-	s.engines, err = s.cfg.CreateEngines(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to create engines")
-	}
-	s.stopper.AddCloser(&s.engines)
 
-	// Write listener info files early in the startup sequence. `listenerInfo` has a comment.
-	listenerFiles := listenerInfo{
-		advertise: unresolvedAdvertAddr.String(),
-		http:      unresolvedHTTPAddr.String(),
-		listen:    unresolvedListenAddr.String(),
-	}.Iter()
+	// Engine is the interface that wraps the core operations of a key/value store.
+	// Engines is a container of engines, allowing convenient closing.
+	s.engines, err = s.cfg.CreateEngines(ctx)
 
 	for _, storeSpec := range s.cfg.Stores.Specs {
 		if storeSpec.InMemory {
 			continue
 		}
+		// ???
 		for base, val := range listenerFiles {
 			file := filepath.Join(storeSpec.Path, base)
 			if err := ioutil.WriteFile(file, []byte(val), 0644); err != nil {
@@ -477,13 +334,10 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}
 
-	log.Info(ctx,"============= how to find key ( min max )")
+	// 根据磁盘上的rocksdb文件，检验文件所属版本跟当前版本是否兼容
 	bootstrappedEngines, _, _, err := inspectEngines(
 		ctx, s.engines, s.cfg.Settings.Version.MinSupportedVersion,
 		s.cfg.Settings.Version.ServerVersion, &s.rpcContext.ClusterID)
-	if err != nil {
-		return errors.Wrap(err, "inspecting engines")
-	}
 
 	// Signal readiness. This unblocks the process when running with
 	// --background or under systemd. At this point we have bound our
@@ -498,42 +352,13 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	// Filter the gossip bootstrap resolvers based on the listen and
-	// advertise addresses.
+	// advertise addresses. 就是从join里把自己摘出来
 	filtered := s.cfg.FilterGossipBootstrapResolvers(ctx, unresolvedListenAddr, unresolvedAdvertAddr)
 	// bigboss here
 	s.gossip.Start(unresolvedAdvertAddr, filtered)
-	log.Event(ctx, "started gossip")
-
-	defer time.AfterFunc(30*time.Second, func() {
-		msg := `The server appears to be unable to contact the other nodes in the cluster. Please try
-
-- starting the other nodes, if you haven't already
-- double-checking that the '--join' and '--host' flags are set up correctly
-- running the 'cockroach init' command if you are trying to initialize a new cluster
-
-If problems persist, please see ` + base.DocsURL("cluster-setup-troubleshooting.html") + "."
-
-		log.Shout(context.Background(), log.Severity_WARNING,
-			msg)
-	}).Stop()
 
 	if len(bootstrappedEngines) > 0 {
-		// We might have to sleep a bit to protect against this node producing non-
-		// monotonic timestamps. Before restarting, its clock might have been driven
-		// by other nodes' fast clocks, but when we restarted, we lost all this
-		// information. For example, a client might have written a value at a
-		// timestamp that's in the future of the restarted node's clock, and if we
-		// don't do something, the same client's read would not return the written
-		// value. So, we wait up to MaxOffset; we couldn't have served timestamps more
-		// than MaxOffset in the future (assuming that MaxOffset was not changed, see
-		// #9733).
-		//
-		// As an optimization for tests, we don't sleep if all the stores are brand
-		// new. In this case, the node will not serve anything anyway until it
-		// synchronizes with other nodes.
-		var sleepDuration time.Duration
-		// Don't have to sleep for monotonicity when using clockless reads
-		// (nor can we, for we would sleep forever).
+		// 处理节点重启，涉及的时钟同步问题，必要时sleep
 		if maxOffset := s.clock.MaxOffset(); maxOffset != timeutil.ClocklessMaxOffset {
 			sleepDuration = maxOffset - timeutil.Since(startTime)
 		}
@@ -542,53 +367,13 @@ If problems persist, please see ` + base.DocsURL("cluster-setup-troubleshooting.
 			time.Sleep(sleepDuration)
 		}
 	} else if len(s.cfg.GossipBootstrapResolvers) == 0 {
-		// If the _unfiltered_ list of hosts from the --join flag is
-		// empty, then this node can bootstrap a new cluster. We disallow
-		// this if this node is being started with itself specified as a
-		// --join host, because that's too likely to be operator error.
-		bootstrapVersion := s.cfg.Settings.Version.BootstrapVersion()
-		if s.cfg.TestingKnobs.Store != nil {
-			if storeKnobs, ok := s.cfg.TestingKnobs.Store.(*storage.StoreTestingKnobs); ok && storeKnobs.BootstrapVersion != nil {
-				bootstrapVersion = *storeKnobs.BootstrapVersion
-			}
-		}
+		// 单节点启动，搞个新集群 这边具体的启动过程，没搞懂???
 		if err := s.node.bootstrap(ctx, s.engines, bootstrapVersion); err != nil {
 			return err
 		}
-		log.Infof(ctx, "**** add additional nodes by specifying --join=%s", s.cfg.AdvertiseAddr)
 	} else {
 		log.Info(ctx, "no stores bootstrapped and --join flag specified, awaiting init command.")
-
-		// Note that when we created the init server, we acquired its semaphore
-		// (to stop anyone from rushing in).
-		s.initServer.semaphore.release()
-
-		s.stopper.RunWorker(workersCtx, func(context.Context) {
-			serveOnMux.Do(func() {
-				netutil.FatalIfUnexpected(m.Serve())
-			})
-		})
-
-		if err := s.initServer.awaitBootstrap(); err != nil {
-			return err
-		}
-
-		// Reacquire the semaphore, allowing the code below to be oblivious to
-		// the fact that this branch was taken.
-		s.initServer.semaphore.acquire()
 	}
-
-	// Release the semaphore of the init server. Anyone still managing to talk
-	// to it may do so, but will be greeted with an error telling them that the
-	// cluster is already initialized.
-	s.initServer.semaphore.release()
-
-	// This opens the main listener.
-	s.stopper.RunWorker(workersCtx, func(context.Context) {
-		serveOnMux.Do(func() {
-			netutil.FatalIfUnexpected(m.Serve())
-		})
-	})
 
 	// We ran this before, but might've bootstrapped in the meantime. This time
 	// we'll get the actual list of bootstrapped and empty engines.
@@ -602,24 +387,10 @@ If problems persist, please see ` + base.DocsURL("cluster-setup-troubleshooting.
 	// Now that we have a monotonic HLC wrt previous incarnations of the process,
 	// init all the replicas. At this point *some* store has been bootstrapped or
 	// we're joining an existing cluster for the first time.
-	// bigboss here
+	// 这边会开gossip同步
 	if err := s.node.start(
-		ctx,
-		unresolvedAdvertAddr,
-		bootstrappedEngines, emptyEngines,
-		s.cfg.NodeAttributes,
-		s.cfg.Locality,
-		cv,
-	); err != nil {
-		return err
-	}
-	log.Event(ctx, "started node")
-	s.execCfg.DistSQLPlanner.SetNodeDesc(s.node.Descriptor)
-
-	// Cluster ID should have been determined by this point.
-	if s.rpcContext.ClusterID.Get() == uuid.Nil {
-		log.Fatal(ctx, "Cluster ID failed to be determined during node startup.")
-	}
+		// ...
+	);
 
 	s.refreshSettings()
 
@@ -652,7 +423,7 @@ If problems persist, please see ` + base.DocsURL("cluster-setup-troubleshooting.
 		testingKnobs = new(sql.SchemaChangerTestingKnobs)
 	}
 
-	// bigboss here
+	// 管理gossip同步过来的table schema变更信息
 	sql.NewSchemaChangeManager(
 		s.cfg.AmbientCtx,
 		s.execCfg,
@@ -662,8 +433,10 @@ If problems persist, please see ` + base.DocsURL("cluster-setup-troubleshooting.
 		s.execCfg.DistSQLPlanner,
 	).Start(s.stopper)
 
+	// Start starts workers for the executor.
 	s.sqlExecutor.Start(ctx, s.execCfg.DistSQLPlanner)
 	s.distSQLServer.Start()
+	// 还是老样子，去gossip那订阅消息干活
 	s.pgServer.Start(ctx, s.stopper)
 
 	s.serveMode.set(modeOperational)
