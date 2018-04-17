@@ -110,6 +110,25 @@ Ex. 1:
   this cached, the process would recurse to lookup the meta2 range
   descriptor). We then find that the first KV pair we see during the scan is
   at "/meta2/p". This is our desired range descriptor.
+
+  Range -> MetaScanBounds -> ScanRequest
+
+  在这种情况下，我们想查找有“f” 的range[f，p）的range描述符。请记住，此描述符将被存储
+  在“/meta2/p”。当然，当我们执行RangeLookup时，实际上我们不
+  知道这个range的界限是什么或者它到底存储在哪里
+  （这就是我们正在查找的！），所以我们必须离开的是
+  查找key。我们首先使用RangeMetaKey查找键来确定meta key
+  ，就是“/meta2/f”。为了这个key，我们使用MetaScanBounds构造扫描范围
+  。这个扫描界限将会是
+  [/meta2/f.Next(),/meta2/max）。
+  不能从“/meta2/f”开始扫描，是因为如果这个key是range开始的key（就像这样
+  在这个例子中！），前一个range的描述符会存储在那个key上。
+  然后，我们在这个range内发布一个前向ScanRequest。因为我们是
+  假设我们已经缓存了包含这key范围的meta2 range，
+  我们直接将请求发送到该range的副本（如果我们没有缓存，该过程会递归查找meta2 range
+  描述符）。然后我们发现我们在扫描过程中看到的第一个KV对
+  在“/meta2/p”。这是我们想要的范围描述符。
+
  1.b: RangeLookup(key=m)
   This case is similar. We construct a scan for this key "m" from
   [/meta2/m.Next(),/meta2/max) and everything works the same as before.
