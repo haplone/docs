@@ -54,7 +54,7 @@ range to the respective meta prefix.
 
 It is often useful to think of Cockroach's ranges as existing in a three
 level tree:
-
+```
            [/meta1/,/meta1/max)   <-- always one range, gossipped, start here!
                     |
          -----------------------
@@ -64,7 +64,7 @@ level tree:
      ---------             ---------
      |       |             |       |
    [a,g)   [g,m)         [m,s)   [s,max)   <- user data
-
+```
 In this analogy, each node (range) contains a number of RangeDescriptors, and
 these descriptors act as pointers to the location of its children. So given a
 key we want to find, we can use the tree structure to find it, starting at
