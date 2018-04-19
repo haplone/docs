@@ -63,7 +63,7 @@ uninitialized, specify the --join flag to point to any healthy node
 
 需要学习的三个知识点：
 * opentracing
-* stopper 
+* stopper
 * grpc
 
 
@@ -143,7 +143,7 @@ func NewServer(cfg Config, stopper *stop.Stopper) (*Server, error) {
 	s.raftTransport = storage.NewRaftTransport(
 		s.cfg.AmbientCtx, st, storage.GossipAddressResolver(s.gossip), s.grpc, s.rpcContext,
 	)
-	// ... LeaseManager manages acquiring and releasing per-table leases
+	// ... LeaseManager manages acquiring and releasing per-table leases每个table的租约
 	s.leaseMgr = sql.NewLeaseManager(
 		// ...
 	)
@@ -273,7 +273,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// 这边有很多的stopper回调事件注册
 	s.stopper.RunWorker(workersCtx, func(context.Context) {
-		// ... 
+		// ...
 	})
 
 	// Attempt to set TCP keep-alive on connection. Don't fail on errors.

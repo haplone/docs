@@ -2,8 +2,12 @@
 # summary
 
 ```
-server/server.go#Start -> sql/pgwire/server.go#ServerConn2 
-	-> sql/pgwire/conn.go#serverConn -> sql/pgwire/conn.go#serverImpl 
+server/server.go#Start 
+	-> sql/pgwire/server.go#ServerConn2 
+	-> sql/pgwire/conn.go#serverConn 
+	-> sql/pgwire/conn.go#serverImpl 
+	-> sql/conn_executor.go#ServerConn
+	-> sql/conn_executor.go#run
 ```
 
 # serverConn

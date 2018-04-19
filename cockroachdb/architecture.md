@@ -10,6 +10,9 @@
 * wal write ahead log 防数据丢失
 * SSTable(sorted string table)作为一个连续的kv构成的块
 * grpc
+* cobra 命令行
+* go panic/recover
+* backtrace
 
 
 
