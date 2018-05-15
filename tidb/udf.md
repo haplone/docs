@@ -38,6 +38,7 @@ var (
 	// ...
 )
 
+// 之前的实现
 type lengthFunctionClass struct {
 	baseFunctionClass
 }
@@ -72,6 +73,7 @@ func (b *builtinLengthSig) evalInt(row types.Row) (int64, bool, error) {
 	return int64(len([]byte(val))), false, nil
 }
 
+// 我们作为例子添加的
 type udfLengthFunctionClass struct{
 	baseFunctionClass
 }
@@ -124,7 +126,7 @@ var funcs = map[string]functionClass{
 ## 重新编译运行tidb可以看到udf已经生效
 
 ```
-MySQL [zjl]> select runoob_id,length(runoob_author) ,udf_length(runoob_author) from tbl_a where udf_length(runoob_author) >10;
+MySQL [test]> select runoob_id,length(runoob_author) ,udf_length(runoob_author) from tbl_a where udf_length(runoob_author) >10;
 +-----------+-----------------------+----------------------------+
 | runoob_id | length(runoob_author) | udf_length(runoob_author) |
 +-----------+-----------------------+----------------------------+
@@ -134,6 +136,6 @@ MySQL [zjl]> select runoob_id,length(runoob_author) ,udf_length(runoob_author) f
 +-----------+-----------------------+----------------------------+
 3 rows in set (7.16 sec)
 
-MySQL [zjl]> select runoob_id,length(runoob_author) ,udf_length(runoob_author) from tbl_a where udf_length(runoob_author) <10;
+MySQL [test]> select runoob_id,length(runoob_author) ,udf_length(runoob_author) from tbl_a where udf_length(runoob_author) <10;
 Empty set (3.48 sec)
 ```
