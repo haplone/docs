@@ -139,3 +139,8 @@ MySQL [test]> select runoob_id,length(runoob_author) ,udf_length(runoob_author) 
 MySQL [test]> select runoob_id,length(runoob_author) ,udf_length(runoob_author) from tbl_a where udf_length(runoob_author) <10;
 Empty set (3.48 sec)
 ```
+## tidb官方提供的教程
+
+[十分钟成为 TiDB Contributor 系列 | 添加內建函数](https://zhuanlan.zhihu.com/p/25782905)
+[十分钟成为 Contributor 系列 | 重构内建函数进度报](https://zhuanlan.zhihu.com/p/27928453)
+
