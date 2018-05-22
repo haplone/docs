@@ -142,5 +142,6 @@ Empty set (3.48 sec)
 ## tidb官方提供的教程
 
 [十分钟成为 TiDB Contributor 系列 | 添加內建函数](https://zhuanlan.zhihu.com/p/25782905)
+
 [十分钟成为 Contributor 系列 | 重构内建函数进度报](https://zhuanlan.zhihu.com/p/27928453)
 
