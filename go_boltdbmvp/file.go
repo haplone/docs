@@ -27,7 +27,7 @@ func getCity(carCh chan model.Car) {
 		for _, c := range cities {
 			idx += c
 		}
-		log.Println(idx)
+		log.Printf("we got %d car infos \n",idx)
 	}()
 
 	for {

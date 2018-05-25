@@ -50,6 +50,75 @@ func (h *Html) GetCurrentPage() (page int) {
 	return page
 }
 
+func (h *Html) GetBrands() []model.Brand {
+	var brands []model.Brand
+	h.D.Find(" ul li").Each(func(i int, selection *goquery.Selection) {
+		id, _ := selection.Attr("id")
+		url, _ := selection.Find("h3 a").Attr("href")
+		name := selection.Find("h3 a").Text()
+
+		var brand = model.Brand{
+			Id:   id,
+			Url:  url,
+			Name: name,
+		}
+		log.Println("brand : ", brand)
+		brands = append(brands, brand)
+	})
+	return brands
+}
+
+func (h *Html) GetSeries() (s []model.Series) {
+	h.D.Find("#brandtab-1 div.list-cont-bg").Each(func(i int, selection *goquery.Selection) {
+		id, _ := selection.Find(".main-title").Attr("id")
+		imgUrl, _ := selection.Find(".list-cont-img img").Attr("src")
+		name := selection.Find(".main-title").Text()
+		url, _ := selection.Find(".main-title a").Attr("href")
+		score := selection.Find(".score-number").Text()
+		price := selection.Find(".lever-price").Text()
+		var details []string
+		selection.Find(".lever-ul li").Each(func(i int, qs *goquery.Selection) {
+			details = append(details, qs.Text())
+		})
+
+		series := model.Series{
+			Id:       id,
+			ImageUrl: imgUrl,
+			Name:     name,
+			Url:      url,
+			Score:    score,
+			Price:    price,
+			Details:  details,
+		}
+		log.Println(series)
+		s = append(s, series)
+	})
+	log.Printf("we got %d series \n", len(s))
+	return
+}
+
+func (h *Html) GetCarSpecs() (cs []model.CarSpec) {
+	h.D.Find(".interval01-list li").Each(func(i int, qs *goquery.Selection) {
+		id, _ := qs.Attr("data-value")
+		name := qs.Find(".interval01-list-cars-infor p a").Text()
+		var details []string
+
+		qs.Find(".interval01-list-cars-infor p span").Each(func(i int, s *goquery.Selection) {
+			details = append(details, s.Text())
+		})
+		price := qs.Find(".interval01-list-guidance").Text()
+
+		car := model.CarSpec{
+			Id:      id,
+			Name:    name,
+			Price:   price,
+			Details: details,
+		}
+		cs = append(cs, car)
+	})
+	return
+}
+
 func (h *Html) GetCars() (cars []model.Car) {
 	cityName := h.GetCityName()
 	h.D.Find(".piclist ul li:not(.line)").Each(func(i int, selection *goquery.Selection) {
