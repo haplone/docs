@@ -24,17 +24,25 @@ var mu = sync.Mutex{}
 */
 
 func main() {
-	var carCh = make(chan []model.Car, 10000)
-	var urlCh = make(chan string, 10000)
+	var carCh = make(chan []model.Car, 10)
+	var urlCh = make(chan string, 10)
 
 	cities := model.GetCites()
 	//cities = cities[:5]
+	//cities = []model.City{
+	//	model.City{
+	//		Id:             23,
+	//		Name:           "平頂山",
+	//		FirstCharacter: "p",
+	//		Pinyin:         "pingdingshan",
+	//	},
+	//}
 	targetSize = len(cities)
 
 	for _, c := range cities {
 		url := fmt.Sprintf(html.StartUrl, c.Pinyin)
 		go Fetch(url, carCh, urlCh)
-		time.Sleep(time.Millisecond * 50)
+		//time.Sleep(time.Millisecond * 5)
 	}
 
 	go func() {
@@ -43,8 +51,8 @@ func main() {
 			case u, ok := <-urlCh:
 				log.Printf("consumes url %s", u)
 				if ok {
-					Fetch(u, carCh, urlCh)
-					time.Sleep(50 * time.Millisecond)
+					go Fetch(u, carCh, urlCh)
+					//time.Sleep(5 * time.Millisecond)
 				}
 			default:
 				time.Sleep(time.Microsecond * 10)
@@ -57,17 +65,20 @@ func main() {
 	w := bufio.NewWriter(f)
 
 	for {
-		cs := <-carCh
-		if cs != nil && len(cs) > 0 {
-			for _, c := range cs {
-				Write(w, c)
-				//d ,_:= json.Marshal(c)
-				//w.WriteString(string(d))
+		select {
+		case cs,ok := <-carCh:
+			if ok && cs != nil && len(cs) > 0 {
+				for _, c := range cs {
+					Write(w, c)
+					//d ,_:= json.Marshal(c)
+					//w.WriteString(string(d))
+				}
+			} else {
+				log.Printf("we have write all datas")
+				break
 			}
-		} else {
-			log.Printf("we have write all datas")
-			break
 		}
+
 	}
 
 	defer w.Flush()
@@ -81,28 +92,26 @@ func Fetch(url string, carCh chan []model.Car, urlCh chan string) {
 	currPageNum := h.GetCurrentPage()
 	nextPageUrl, _ := h.GetNextPageUrl()
 
+
 	log.Printf("fetch %s \n", url)
+	log.Printf("new page url : %s \n", nextPageUrl)
+
 	if currPageNum > 0 && currPageNum <= html.MaxPageSize {
 		cars := h.GetCars()
 
 		if cars != nil && len(cars) > 0 {
 			carCh <- cars
 			log.Printf("we got %d car info\n", len(cars))
-		} else {
-
 		}
 
 		if nextPageUrl != "" {
 			log.Printf("we got new url %s", nextPageUrl)
 			urlCh <- nextPageUrl
+		} else {
+			checkStatus(carCh)
 		}
 	} else {
-		mu.Lock()
-		currSize += 1
-		if currSize >= targetSize {
-			carCh <- nil
-		}
-		mu.Unlock()
+		checkStatus(carCh)
 	}
 }
 
@@ -115,6 +124,15 @@ func Write(w *bufio.Writer, car model.Car) {
 	w.Write(json)
 	w.WriteString("\n")
 	w.Flush()
+}
+
+func checkStatus(carCh chan []model.Car) {
+	mu.Lock()
+	currSize += 1
+	if currSize >= targetSize {
+		carCh <- nil
+	}
+	mu.Unlock()
 }
 
 func Check(e error) {

@@ -37,6 +37,19 @@ type Car struct {
 	DealerId  string  `json: "dealer_id"`
 }
 
+type Brand struct{
+	Id string
+	Name string
+	Url string
+}
+
+type Series struct{
+	Id string
+	ImageUrl string
+	Name string
+	Url string
+
+}
 func GetCites() []City {
 	if checkFileIsExists(Province_city_json_file) {
 		data, err := ioutil.ReadFile(Province_city_json_file)
