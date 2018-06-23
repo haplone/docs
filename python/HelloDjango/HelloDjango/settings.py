@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'ModelCar',
+    'Notebook',
 ]
 
 MIDDLEWARE = [
@@ -76,10 +76,10 @@ DATABASES = {
         # 'ENGINE': 'django.db.backends.sqlite3',
         # 'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'zjl',
+        'NAME': 'test',
         'USER': 'root',
-        'PASSWORD': 'puhui123!',
-        'HOST': '10.10.50.195',
+        'PASSWORD': 'toy',
+        'HOST': 'localhost',
         'PORT': '3306',
     }
 }
