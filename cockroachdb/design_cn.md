@@ -246,7 +246,7 @@ Cockroach 通过关联提交时间戳方式实现value多个历史版本的存�
 Cockroach provides distributed transactions without locks. Cockroach
 transactions support two isolation levels:
 
-Cockroach 无锁方式实现分布式事物。Cockroach事物支持2种隔离级别：
+Cockroach 无锁方式实现分布式事务。Cockroach事务支持2种隔离级别：
 
 - snapshot isolation (SI) and
 - *serializable* snapshot isolation (SSI).
@@ -268,14 +268,8 @@ implementation of SSI still requires no locking, but will end up
 aborting more transactions. Cockroach’s SI and SSI implementations
 prevent starvation scenarios even for arbitrarily long transactions.
 
-SSI是默认级别，SI为应用程序开发人员提供
-他们对他们的表现和缺席的需求是肯定的
-编写偏斜条件以有意识地选择使用它。 轻轻一点
-竞争系统，我们对SSI的执行与SI一样，
-不需要锁定或额外写入。 争议，我们的
-SSI的实施仍然不需要锁定，但最终会结束
-中止更多交易。 蟑螂的SI和SSI实施
-即使对于任意长的交易也能防止饥饿情况。
+SSI是默认级别，如果应用程序开发人员明确性能需求，并且没有write skew情况，可以使用SI级别。在轻度竞争系统中，我们的SSI实现没有锁和额外写入，具有跟SI一样的性能。在有竞争的情况，我们的SSI实现一样没有锁，但是会有更多的事务被取消。Cockroach的SI和SSI实现，可以防止任意长事务导致的饥饿。
+
 
 See the [Cahill paper](https://drive.google.com/file/d/0B9GCVTp_FHJIcEVyZVdDWEpYYXVVbFVDWElrYUV0NHFhU2Fv/edit?usp=sharing)
 for one possible implementation of SSI. This is another [great paper](http://cs.yale.edu/homes/thomson/publications/calvin-sigmod12.pdf).
@@ -284,12 +278,8 @@ For a discussion of SSI implemented by preventing read-write conflicts
 the [Yabandeh paper](https://drive.google.com/file/d/0B9GCVTp_FHJIMjJ2U2t6aGpHLTFUVHFnMTRUbnBwc2pLa1RN/edit?usp=sharing),
 which is the source of much inspiration for Cockroach’s SSI.
 
-请参阅[Cahill论文]（https://drive.google.com/file/d/0B9GCVTp_FHJIcEVyZVdDWEpYYXVVbFVDWElrYUV0NHFhU2Fv/edit?usp=sharing）
-为SSI的一个可能的实施。 这是另一个[伟大的论文]（http://cs.yale.edu/homes/thomson/publications/calvin-sigmod12.pdf）。
-有关通过防止读写冲突实施的SSI的讨论
-（与检测它们不同，称为写入快照隔离），请参阅
-[Yabandeh论文]（https://drive.google.com/file/d/0B9GCVTp_FHJIMjJ2U2t6aGpHLTFUVHFnMTRUbnBwc2pLa1RN/edit?usp=sharing），
-这是蟑螂SSI的灵感源泉
+请参阅[Cahill论文]（https://drive.google.com/file/d/0B9GCVTp_FHJIcEVyZVdDWEpYYXVVbFVDWElrYUV0NHFhU2Fv/edit?usp=sharing）为SSI的一个可能的实施。 这是另一个[伟大的论文]（http://cs.yale.edu/homes/thomson/publications/calvin-sigmod12.pdf）。有关通过防止读写冲突实施的SSI的讨论
+（与检测它们不同，称为写入快照隔离），请参阅[Yabandeh论文]（https://drive.google.com/file/d/0B9GCVTp_FHJIMjJ2U2t6aGpHLTFUVHFnMTRUbnBwc2pLa1RN/edit?usp=sharing），这是蟑螂SSI的灵感源泉
 
 
 Both SI and SSI require that the outcome of reads must be preserved, i.e.
