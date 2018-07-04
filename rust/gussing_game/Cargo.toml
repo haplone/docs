@@ -1,0 +1,6 @@
+[package]
+name = "gussing_game"
+version = "0.1.0"
+authors = ["haplone <haplong@gmail.com>"]
+
+[dependencies]
