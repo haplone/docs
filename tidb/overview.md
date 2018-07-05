@@ -8,7 +8,7 @@ TiDB 本质上是一个更加正统的 Spanner 和 F1 实现，并不 CockroachD
 
 ![tidb architure](tidb_architure.jpg)
 
-![tidb sql architure](tidb_sql_architure.jpg)
+![tidb sql architure](tidb_sql_layer.jpg)
 
 ![tikv architure](tikv_architure.jpg)
 
