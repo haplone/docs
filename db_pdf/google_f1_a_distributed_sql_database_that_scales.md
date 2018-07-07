@@ -351,3 +351,104 @@ Users can also selectively reduce concurrency by using a lock column in a parent
 Many database users build mechanisms to log changes, either from application code or using database features like triggers. In the MySQL system that AdWords used before F1, our Java application libraries added change history records into all transactions. This was nice, but it was inefficient and never 100% reliable. Some classes of changes would not get history records, including changes written from Python scripts and manual SQL data changes.
 
 In F1, Change History is a first-class feature at the database level, where we can implement it most efficiently and can guarantee full coverage. In a change-tracked database, all tables are change-tracked by default, although specific tables or columns can be opted out in the schema. Every transaction in F1 creates one or more ChangeBatch Protocol Buffers, which include the primary key and before and after values of changed columns for each updated row. These ChangeBatches are written into normal F1 tables that exist as children of each root table. The primary key of the ChangeBatch table includes the associated root table key and the transaction commit timestamp. When a transaction updates data under multiple root rows, possibly from different root table hierarchies, one ChangeBatch is written for each distinct root row (and these ChangeBatches include pointers to each other so the full transaction can be re-assembled if necessary). This means that for each root row, the change history table includes ChangeBatches showing all changes associated with children of that root row, in commit order, and this data is easily queryable with SQL. This clustering also means that change history is stored close to the data being tracked, so these additional writes normally do not add additional participants into Spanner transactions, and therefore have minimal latency impact.
+
+
+F1’s ChangeHistory mechanism has a variety of uses. The most common use is in applications that want to be notified of changes and then do some incremental processing. For example, the approval system needs to be notified when new ads have been inserted so it can approve them. F1 uses a publish-and-subscribe system to push notifications that particular root rows have changed. The publish happens in Spanner and is guaranteed to happen at least once after any series of changes to any root row. Subscribers normally remember a checkpoint (i.e. a high-water mark) for each root row and read all changes newer than the checkpoint whenever they receive a notification. This is a good example of a place where Spanner’s timestamp ordering properties are very powerful since they allow using checkpoints to guarantee that every change is processed exactly once. A separate system exists that makes it easy for these clients to see only changes to tables or columns they care about.
+
+
+Change History also gets used in interesting ways for caching. One client uses an in-memory cache based on database state, distributed across multiple servers, and uses this while rendering pages in the AdWords web UI. After a user commits an update, it is important that the next page rendered reflects that update. When this client reads from the cache, it passes in the root row key and the commit timestamp of the last write that must be visible. If the cache is behind that timestamp, it reads Change History records beyond its checkpoint and applies those changes to its in-memory state to catch up. This is much cheaper than reloading the cache with a full extraction and much simpler and more accurate than comparable cache invalidation protocols.
+
+# client design
+
+## simplified ORM
+
+The nature of working with a distributed data store required us to rethink the way our client applications interacted with the database. Many of our client applications had been written using a MySQL-based ORM layer that could not be adapted to work well with F1. Code written using this library exhibited several common ORM anti-patterns:
+
+* Obscuring database operations from developers.
+* Serial reads, including for loops that do one query per iteration.
+* Implicit traversals: adding unwanted joins and loading unnecessary data “just in case”.
+
+* 模糊/隐藏开发人员的数据库操作
+* 串行读取，包括每次迭代执行一次查询的循环。
+* 隐式遍历：添加不需要的连接并加载不必要的数据“以防万一”。
+
+Patterns like these are common in ORM libraries. They may save development time in small-scale systems with local data stores, but they hurt scalability even then. When combined with a high-latency remote database like F1, they are disastrous. For F1, we replaced this ORM layer with a new, stripped-down API that forcibly avoids these anti-patterns. The new ORM layer does not use any joins and does not implicitly traverse any relationships between records. All object loading is explicit, and the ORM layer exposes APIs that promote the use of parallel and asynchronous read access. This is practical in an F1 schema for two reasons. First, there are simply fewer tables, and clients are usually loading Protocol Buffers directly from the database. Second, hierarchically structured primary keys make loading all children of an object expressible as a single range read without a join.
+
+With this new F1 ORM layer, application code is more explicit and can be slightly more complex than code using the MySQL ORM, but this complexity is partially offset by the reduced impedance mismatch provided by Protocol Buffer columns. The transition usually results in better client code that uses more efficient access patterns to the database. Avoiding serial reads and other anti-patterns re- sults in code that scales better with larger data sets and exhibits a flatter overall latency distribution.
+
+使用这个新的F1 ORM层，应用程序代码更加明确，并且可能比使用MySQL ORM的代码稍微复杂一些，但这种复杂性部分地被协议缓冲区列提供的减少的阻抗不匹配所抵消。 转换通常会产生更好的客户端代码，使用更高效的数据库访问模式。 避免串行读取和其他反模式会导致代码在更大的数据集中更好地扩展，并显示更平坦的整体延迟分布。
+
+With MySQL, latency in our main interactive application was highly variable. Average latency was typically 200-300 ms. Small operations on small customers would run much faster than that, but large operations on large customers could be much slower, with a latency tail of requests taking multiple seconds. Developers regularly fought to identify and fix cases in their code causing excessively serial reads and high latency. With our new coding style on the F1 ORM, this doesn’t happen. User requests typically require a fixed number (fewer than 10) of reads, independent of request size or data size. The minimum latency is higher than in MySQL because of higher minimum read cost, but the average is about the same, and the latency tail for huge requests is only a few times slower than the median.
+
+## nosql interface
+
+F1 supports a NoSQL key/value based interface that allows for fast and simple programmatic access to rows. Read requests can include any set of tables, requesting specific columns and key ranges for each. Write requests specify inserts, updates, and deletes by primary key, with any new column values, for any set of tables.
+
+This interface is used by the ORM layer under the hood, and is also available for clients to use directly. This API allows for batched retrieval of rows from multiple tables in a single call, minimizing the number of round trips required to complete a database transaction. Many applications prefer to use this NoSQL interface because it’s simpler to construct structured read and write requests in code than it is to generate SQL. This interface can be also be used in MapReduces to specify which data to read.
+
+
+## sql interface
+
+F1 also provides a full-fledged SQL interface, which is used for low-latency OLTP queries, large OLAP queries, and everything in between. F1 supports joining data from its Spanner data store with other data sources including Bigtable, CSV files, and the aggregated analytical data warehouse for AdWords. The SQL dialect extends standard SQL with constructs that allow accessing data stored in Protocol Buffers. Updates are also supported using SQL data manipulation statements, with extensions to support updating fields inside protocol buffers and to deal with repeated structure inside protocol buffers. Full syntax details are beyond the scope of this paper.
+
+# query processing
+
+The F1 SQL query processing system has the following key properties which we will elaborate on in this section:
+
+* Queries are executed either as low-latency centrally executed queries or distributed queries with high parallelism.
+
+* All data is remote and batching is used heavily to mitigate network latency.
+
+* All input data and internal data is arbitrarily partitioned and has few useful ordering properties.
+
+* Queries use many hash-based repartitioning steps.
+
+* Individual query plan operators are designed to stream data to later operators as soon as possible, maximizing pipelining in query plans.
+
+* Hierarchically clustered tables have optimized access methods.
+* Query data can be consumed in parallel.
+* Protocol Buffer-valued columns provide first-class support for structured data types.
+* Spanner’s snapshot consistency model provides globally consistent results.
+
+
+* 查询作为低延迟集中执行查询或具有高并行性的分布式查询执行。
+
+* 所有数据都是远程的，并且大量使用批处理来缓解网络延迟。
+
+* 所有输入数据和内部数据都是任意分区的，并且几乎没有有用的排序属性。
+
+* 查询使用许多基于散列的重新分区步骤。
+
+* 单个查询计划运算符旨在尽快将数据流式传输到后期运算符，从而最大限度地提高查询计划中的流水线。
+
+* 分层聚簇表具有优化的访问方法。
+* 查询数据可以并行使用。
+* Protocol Buffer-valued列提供对结构化数据类型的一流支持。
+* Spanner的快照一致性模型提供全局一致的结果。
+
+## central and distributed Queries
+
+F1 SQL supports both centralized and distributed execution of queries. Centralized execution is used for short OLTP-style queries and the entire query runs on one F1 server node. Distributed execution is used for OLAP-style queries and spreads the query workload over worker tasks in the F1 slave pool (see Section 2). Distributed queries always use snapshot transactions. The query optimizer uses heuristics to determine which execution mode is appropriate for a given query. In the sections that follow, we will mainly focus our attention on distributed query execution. Many of the concepts apply equally to centrally executed queries.
+
+## distrbuted query example
+
+The following example query would be answered using distributed execution:
+
+```SQL
+SELECT agcr.CampaignId, click.Region,
+       cr.Language, SUM(click.Clicks)
+FROM AdClick click
+  JOIN AdGroupCreative agcr
+    USING (AdGroupId, CreativeId)
+  JOIN Creative cr
+USING (CustomerId, CreativeId) WHERE click.Date = '2013-03-23'
+GROUP BY agcr.CampaignId, click.Region, cr.Language
+```
+
+This query uses part of the AdWords schema. An AdGroup is a collection of ads with some shared configuration. A Creative is the actual ad text. The AdGroupCreative table is a link table between AdGroup and Creative; Creatives can be shared by multiple AdGroups. Each AdClick records the Creative that the user was shown and the AdGroup from which the Creative was chosen. This query takes all AdClicks on a specific date, finds the corresponding AdGroupCreative and then the Creative. It then aggregates to find the number of clicks grouped by campaign, region and language.
+
+A possible query plan for this query is shown in Figure 3. In the query plan, data is streamed bottom-up through each of the operators up until the aggregation operator. The deepest operator performs a scan of the AdClick table. In the same worker node, the data from the AdClick scan flows into a lookup join operator, which looks up AdGroupCreative records using a secondary index key. The plan then repartitions the data stream by a hash of the CustomerId and CreativeId, and performs a lookup in a hash table that is partitioned in the same way (a distributed hash join). After the distributed hash join, the data is once again repartitioned, this time by a hash of the CampaignId, Region and Language fields, and then fed into an aggregation operator that groups by those same fields (a distributed aggregation).
+
+## remote data
+
+SQL query processing, and join processing in particular, poses some interesting challenges in F1, primarily because F1 does not store its data locally. F1’s main data store is Spanner, which is a remote data source, and F1 SQL can also access other remote data sources and join across them. These remote data accesses involve highly variable network latency [9]. In contrast, traditional database systems gen- erally perform processing on the same machine that hosts their data, and they mostly optimize to reduce the number of disk seeks and disk accesses.
