@@ -1,14 +1,8 @@
-
+F1: A Distributed SQL Database That Scales
 
 # abstract
 
-F1 is a distributed relational database system built at
-Google to support the AdWords business. F1 is a hybrid
-database that combines high availability, the scalability of
-NoSQL systems like Bigtable, and the consistency and usability of traditional SQL databases. F1 is built on Spanner, which provides synchronous cross-datacenter replication and strong consistency. Synchronous replication implies higher commit latency, but we mitigate that latency
-by using a hierarchical schema model with structured data
-types and through smart application design. F1 also includes a fully functional distributed SQL query engine and
-automatic change tracking and publishing.
+F1 is a distributed relational database system built at Google to support the AdWords business. F1 is a hybrid database that combines high availability, the scalability of NoSQL systems like Bigtable, and the consistency and usability of traditional SQL databases. F1 is built on Spanner, which provides synchronous cross-datacenter replication and strong consistency. Synchronous replication implies higher commit latency, but we mitigate that latency by using a hierarchical schema model with structured data types and through smart application design. F1 also includes a fully functional distributed SQL query engine and automatic change tracking and publishing.
 
 
 F1是一个构建于的分布式关系数据库系统Google支持AdWords业务。
@@ -18,11 +12,7 @@ F1是混合数据库，实现了高可用性，像Bigtable这样的NoSQL系统�
 
 # introduction
 
-F1 is a fault-tolerant globally-distributed OLTP and
-OLAP database built at Google as the new storage system
-for Google’s AdWords system. It was designed to replace a
-sharded MySQL implementation that was not able to meet
-our growing scalability and reliability
+F11 is a fault-tolerant globally-distributed OLTP and OLAP database built at Google as the new storage system for Google’s AdWords system. It was designed to replace a sharded MySQL implementation that was not able to meet our growing scalability and reliability requirements.
 
 F1是一个容错的全局分布式OLTP和
 OLAP数据库是在Google上构建的新存储系统
@@ -33,48 +23,30 @@ OLAP数据库是在Google上构建的新存储系统
 
 The key goals of F1’s design are:
 
-* **Scalability**: The system must be able to scale up,
-trivially and transparently, just by adding resources.
-Our sharded database based on MySQL was hard to
-scale up, and even more difficult to rebalance. Our
-users needed complex queries and joins, which meant
-they had to carefully shard their data, and resharding
-data without breaking applications was challenging.
+* **Scalability**: The system must be able to scale up, trivially and transparently, just by adding resources. Our sharded database based on MySQL was hard to scale up, and even more difficult to rebalance. Our users needed complex queries and joins, which meant they had to carefully shard their data, and resharding data without breaking applications was challenging.
 
 
 * **可扩展性**：系统必须能够扩展，通过添加资源，简单而透明地进行。我们基于MySQL的分片数据库很难扩大规模，甚至更难以重新平衡。 我们的用户需要复杂的查询和连接，这意味着他们不得不仔细地对他们的数据进行分片并重新分析数据不破坏应用程序是一项挑战
 
-* **Availability**: The system must never go down for any
-reason – datacenter outages, planned maintenance,
-schema changes, etc. The system stores data for
-Google’s core business. Any downtime has a significant revenue impact.
+* **Availability**: The system must never go down for any reason – datacenter outages, planned maintenance, schema changes, etc. The system stores data for Google’s core business. Any downtime has a significant revenue impact.
 
 * **高可用**：系统绝对不能用于任何系统原因 - 数据中心中断，计划维护，架构更改等。系统存储数据谷歌的核心业务。 任何停机都会对收入产生重大影响。
 
 * **Consistency**: The system must provide ACID transactions, and must always present applications with consistent and correct data.
 Designing applications to cope with concurrency anomalies in their data is very error-prone, time-consuming, and ultimately not worth the performance gains.
 
+
 * **一致性**：系统必须提供ACID事务，并且必须始终为应用程序提供一致且正确的数据。
 设计应用程序以处理其数据中的并发异常非常容易出错，耗时，并且最终不值得获得性能提升。
 
 
-* **Usability**: The system must provide full SQL query
-support and other functionality users expect from a
-SQL database. Features like indexes and ad hoc query
-are not just nice to have, but absolute requirements
-for our business.
+* **Usability**: The system must provide full SQL query support and other functionality users expect from a SQL database. Features like indexes and ad hoc query are not just nice to have, but absolute requirements for our business.
 
-* **可用性**：系统必须提供完整的SQL查询用户期望的支持和其他功能SQL数据库。 索引和即席查询等功能不仅仅是好的，而是绝对的要求为了我们的业务。
+* **易用性**：系统必须提供完整的SQL查询用户期望的支持和其他功能SQL数据库。 索引和即席查询等功能不仅仅是好的，而是绝对的要求为了我们的业务。
 
 
-Recent publications have suggested that these design goals
-are mutually exclusive [5, 11, 23]. A key contribution of this
-paper is to show how we achieved all of these goals in F1’s
-design, and where we made trade-offs and sacrifices. The
-name F1 comes from genetics, where a Filial 1 hybrid is the
-first generation offspring resulting from a cross mating of
-distinctly different parental types. The F1 database system
-is indeed such a hybrid, combining the best aspects of traditional relational databases and scalable NoSQL systems like Bigtable [6].
+Recent publications have suggested that these design goals are mutually exclusive [5, 11, 23]. A key contribution of this paper is to show how we achieved all of these goals in F1’s design, and where we made trade-offs and sacrifices. The name F1 comes from genetics, where a Filial 1 hybrid is the first generation offspring resulting from a cross mating of distinctly different parental types. The F1 database system is indeed such a hybrid, combining the best aspects of traditional relational databases and scalable NoSQL systems like Bigtable [6].
+
 
 最近的出版物提出了这些设计目标
 相互排斥[5,11,23]。 这是一个关键的贡献
@@ -86,9 +58,7 @@ is indeed such a hybrid, combining the best aspects of traditional relational da
 确实是这样一种混合体，结合了传统关系数据库的最佳方面和可扩展的NoSQL系统，如Bigtable [6]。
 
 
-F1 is built on top of Spanner [7], which provides extremely
-scalable data storage, synchronous replication, and strong
-consistency and ordering properties. F1 inherits those features from Spanner and adds several more:
+F1 is built on top of Spanner [7], which provides extremely scalable data storage, synchronous replication, and strong consistency and ordering properties. F1 inherits those features from Spanner and adds several more:
 
 F1建立在Spanner [7]的基础之上，非常提供可扩展的数据存储，同步复制和强大一致性和排序属性。 F1从Spanner继承了这些功能，并添加了几个：
 
@@ -98,11 +68,11 @@ F1建立在Spanner [7]的基础之上，非常提供可扩展的数据存储，�
 * Optimistic transactions
 * Automatic change history recording and publishing
 
-* 分布式SQL查询，包括连接外部数据源的数据
+* 分布式SQL查询，包括join外部数据源的数据
 * 事务上一致的二级索引
 * 异步模式更改，包括数据库重组
 * 乐观的事务
-* 自动更改历史记录和发布
+* 更改历史的自动记录和发布
 
 Our design choices in F1 result in higher latency for typical reads and writes. We have developed techniques to hide that increased latency, and we found that user-facing transactions can be made to perform as well as in our previous MySQL system:
 
@@ -451,4 +421,146 @@ A possible query plan for this query is shown in Figure 3. In the query plan, da
 
 ## remote data
 
-SQL query processing, and join processing in particular, poses some interesting challenges in F1, primarily because F1 does not store its data locally. F1’s main data store is Spanner, which is a remote data source, and F1 SQL can also access other remote data sources and join across them. These remote data accesses involve highly variable network latency [9]. In contrast, traditional database systems gen- erally perform processing on the same machine that hosts their data, and they mostly optimize to reduce the number of disk seeks and disk accesses.
+SQL query processing, and join processing in particular, poses some interesting challenges in F1, primarily because F1 does not store its data locally. F1’s main data store is Spanner, which is a remote data source, and F1 SQL can also access other remote data sources and join across them. These remote data accesses involve highly variable network latency [9]. In contrast, traditional database systems generally perform processing on the same machine that hosts their data, and they mostly optimize to reduce the number of disk seeks and disk accesses.
+
+Network latency and disk latency are fundamentally different in two ways. First, network latency can be mitigated by batching or pipelining data accesses. F1 uses extensive batching to mitigate network latency. Secondly, disk latency is generally caused by contention for a single limited resource, the actual disk hardware. This severely limits the usefulness of sending out multiple data accesses at the same time. In contrast, F1’s network based storage is typically distributed over many disks, because Spanner partitions its data across many physical servers, and also at a finer-grained level because Spanner stores its data in CFS. This makes it much less likely that multiple data accesses will contend for the same resources, so scheduling multiple data accesses in parallel often results in near-linear speedup until the underlying storage system is truly overloaded.
+
+
+The prime example of how F1 SQL takes advantage of batching is found in the lookup join query plan operator. This operator executes a join by reading from the inner table using equality lookup keys. It first retrieves rows from the outer table, extracting the lookup key values from them and deduplicating those keys. This continues until it has gathered 50MB worth of data or 100,000 unique lookup key values. Then it performs a simultaneous lookup of all keys in the inner table. This returns the requested data in arbitrary order. The lookup join operator joins the retrieved inner table rows to the outer table rows which are stored in memory, using a hash table for fast lookup. The results are streamed immediately as output from the lookup join node.
+
+F1’s query operators are designed to stream data as much as possible, reducing the incidence of pipeline stalls. This design decision limits operators’ ability to preserve interesting data orders. Specifically, an F1 operator often has many reads running asynchronously in parallel, and streams rows to the next operator as soon as they are available. This emphasis on data streaming means that ordering properties of the input data are lost while allowing for maximum read request concurrency and limiting the space needed for row buffering.
+
+## distrbuted execution overview
+
+The structure of a distributed query plan is as follows. A full query plan consists of potentially tens of plan parts, each of which represents a number of workers that execute the same query subplan. The plan parts are organized as a directed acyclic graph (DAG), with data flowing up from the leaves of the DAG to a single root node, which is the only node with no out edges, i.e. the only sink. The root node, also called the query coordinator, is executed by the server that received the incoming SQL query request from a client. The query coordinator plans the query for execution, receives results from the penultimate plan parts, performs any final aggregation, sorting, or filtering, and then streams the results back to the client, except in the case of partitioned consumers as described in Section 8.6.
+
+A technique frequently used by distributed database systems is to take advantage of an explicit co-partitioning of the stored data. Such co-partitioning can be used to push down large amounts of query processing onto each of the processing nodes that host the partitions. F1 cannot take advantage of such partitioning, in part because the data is always remote, but more importantly, because Spanner applies an arbitrary, effectively random partitioning. Moreover, Spanner can also dynamically change the partitioning. Hence, to perform operations efficiently, F1 must frequently resort to repartitioning the data. Because none of the input data is range partitioned, and because range partitioning depends on correct statistics, we have eschewed range partitioning altogether and opted to only apply hash partitioning.
+
+
+Traditionally, repartitioning like this has been regarded as something to be avoided because of the heavy network traffic involved. Recent advances in the scalability of network switch hardware have allowed us to connect clusters of several hundred F1 worker processes in such a way that all servers can simultaneously communicate with each other at close to full network interface speed. This allows us to repartition without worrying much about network capacity and concepts like rack affinity. A potential downside of this solution is that it limits the size of an F1 cluster to the limits of available network switch hardware. This has not posed a problem in practice for the queries and data sizes that the F1 system deals with.
+
+
+The use of hash partitioning allows us to implement an efficient distributed hash join operator and a distributed aggregation operator. These operators were already demon-strated in the example query in Section 8.2. The hash join operator repartitions both of its inputs by applying a hash function to the join keys. In the example query, the hash join keys are CustomerId and CreativeId. Each worker is responsible for a single partition of the hash join. Each worker loads its smallest input (as estimated by the query planner) into an in-memory hash table. It then reads its largest input and probes the hash table for each row, streaming out the results. For distributed aggregation, we aggregate as much as possible locally inside small buffers, then repartition the data by a hash of the grouping keys, and finally perform a full aggregation on each of the hash partitions. When hash tables grow too large to fit in memory, we apply standard algorithms that spill parts of the hash table to disk.
+
+F1 SQL operators execute in memory, without checkpointing to disk, and stream data as much as possible. This avoids the cost of saving intermediate results to disk, so queries run as fast as the data can be processed. This means, however, that any server failure can make an entire query fail. Queries that fail get retried transparently, which usually hides these failures. In practice, queries that run for up to an hour are sufficiently reliable, but queries much longer than that may experience too many failures. We are exploring adding checkpointing for some intermediate results into our query plans, but this is challenging to do without hurting latency in the normal case where no failures occur.
+
+## hierachical table joins
+
+As described in Section 3.1, the F1 data model supports hierarchically clustered tables, where the rows of a child table are interleaved in the parent table. This data model allows us to efficiently join a parent table and a descendant table by their shared primary key prefix. For instance, consider the join of table Customer with table Campaign:
+
+```SQL
+SELECT *
+  FROM Customer JOIN
+       Campaign USING (CustomerId)
+```
+
+The hierarchically clustered data model allows F1 to perform this join using a single request to Spanner in which we request the data from both tables. Spanner will return the data to F1 in interleaved order (a pre-order depth-first traversal), ordered by primary key prefix, e.g.:
+
+```
+Customer(3)
+    Campaign(3,5)
+    Campaign(3,6)
+  Customer(4)
+    Campaign(4,2)
+    Campaign(4,4)
+```
+
+While reading this stream, F1 uses a merge-join-like algorithm which we call cluster join. The cluster join operator only needs to buffer one row from each table, and returns the joined results in a streaming fashion as the Spanner input data is received. Any number of tables can be cluster joined this way using a single Spanner request, as long as all tables fall on a single ancestry path in the table hierarchy. For instance, in the following table hierarchy, F1 SQL can only join RootTable to either ChildTable1 or ChildTable2 in this way, but not both:
+
+```
+RootTable
+    ChildTable1
+    ChildTable2
+```
+
+When F1 SQL has to join between sibling tables like these, it will perform one join operation using the cluster join algorithm, and select an alternate join algorithm for the remaining join. An algorithm such as lookup join is able to perform this join without disk spilling or unbounded memory usage because it can construct the join result piecemeal using bounded-size batches of lookup keys.
+
+## partitioned consumers
+
+F1 queries can produce vast amounts of data, and pushing this data through a single query coordinator can be a bottleneck. Furthermore, a single client process receiving all the data can also be a bottleneck and likely cannot keep up with many F1 servers producing result rows in parallel. To solve this, F1 allows multiple client processes to consume sharded streams of data from the same query in parallel. This feature is used for partitioned consumers like MapReduces[10]. The client application sends the query to F1 and requests distributed data retrieval. F1 then returns a set of endpoints to connect to. The client must connect to all of these endpoints and retrieve the data in parallel. Due to the streaming nature of F1 queries, and the cross-dependencies caused by frequent hash repartitioning, slowness in one distributed reader may slow other distributed readers as well, as the F1 query produces results for all readers in lock-step. A possible, but so far unimplemented mitigation strategy for this horizontal dependency is to use disk-backed buffering to break the dependency and to allow clients to proceed independently.
+
+## queries with Protocol Buffers
+
+As explained in Section 3, the F1 data model makes heavy use of Protocol Buffer valued columns. The F1 SQL dialect treats these values as first class objects, providing full access to all of the data contained therein. For example, the following query requests the `CustomerId` and the entire Protocol Buffer valued column `Info` for each customer whose country code is `US`.
+
+```SQL
+SELECT c.CustomerId, c.Info
+FROM Customer AS c
+WHERE c.Info.country_code = 'US'
+```
+
+This query illustrates two aspects of Protocol Buffer support. First, queries use path expressions to extract individual fields (`c.Info.country code`). Second, F1 SQL also allows for querying and passing around entire protocol buffers (`c.Info`). Support for full Protocol Buffers reduces the impedance mismatch between F1 SQL and client applications, which often prefer to receive complete Protocol Buffers.
+
+Protocol Buffers also allow `repeated fields`, which may have zero or more instances, i.e., they can be regarded as variable-length arrays. When these repeated fields occur in F1 database columns, they are actually very similar to hierarchical child tables in a 1:N relationship. The main difference between a child table and a repeated field is that the child table contains an explicit foreign key to its parent table, while the repeated field has an implicit foreign key to the Protocol Buffer containing it. Capitalizing on this similarity, F1 SQL supports access to repeated fields using PROTO JOIN, a JOIN variant that joins by the implicit foreign key. For instance, suppose that we have a table `Customer`, which has a Protocol Buffer column `Whitelist` which in turn contains a repeated field feature. Furthermore, suppose that the values of this field feature are themselves Protocol Buffers, each of which represents the whitelisting status of a particular feature for the parent `Customer`.
+
+```SQL
+SELECT c.CustomerId, f.feature
+  FROM Customer AS c
+PROTO JOIN c.Whitelist.feature AS f WHERE f.status = 'STATUS_ENABLED'
+```
+
+This query joins the `Customer` table with its virtual child table `Whitelist.feature` by the foreign key that is implied by containment. It then filters the resulting combinations by the value of a field `f.status` inside the child table f, and returns another field `f.feature` from that child table. In this query syntax, the PROTO JOIN specifies the parent relation of the repeated field by qualifying the repeated field name with `c`, which is the alias of the parent relation. The implementation of the PROTO JOIN construct is straightforward: in the read from the outer relation we retrieve the entire Protocol Buffer column containing the repeated field, and then for each outer row we simply enumerate the repeated field instances in memory and join them to the outer row.
+
+F1 SQL also allows subqueries on repeated fields in Protocol Buffers. The following query has a scalar subquery to count the number of `Whitelist.features`, and an EXISTS subquery to select only `Customers` that have at least one feature that is not `ENABLED`. Each subquery iterates over repeated field values contained inside Protocol Buffers from the current row.
+
+```SQL
+SELECT c.CustomerId, c.Info,
+    (SELECT COUNT(*) FROM c.Whitelist.feature) nf
+  FROM Customer AS c
+  WHERE EXISTS (SELECT * FROM c.Whitelist.feature f
+WHERE f.status != 'ENABLED')
+```
+
+Protocol Buffers have performance implications for query processing. First, we always have to fetch entire Protocol Buffer columns from Spanner, even when we are only interested in a small subset of fields. This takes both additional network and disk bandwidth. Second, in order to extract the fields that the query refers to, we always have to parse the contents of the Protocol Buffer fields. Even though we have implemented an optimized parser to extract only requested fields, the impact of this decoding step is significant. Future versions will improve this by pushing parsing and field selection to Spanner, thus reducing network bandwidth required and saving CPU in F1 while possibly using more CPU in Spanner.
+
+# deployment
+
+The F1 and Spanner clusters currently deployed for AdWords use five datacenters spread out across mainland US. The Spanner configuration uses 5-way Paxos replication to ensure high availability. Each region has additional readonly replicas that do not participate in the Paxos algorithm. Read-only replicas are used only for snapshot reads and thus allow us to segregate OLTP and OLAP workloads.
+
+副本数 5
+Intuitively, 3-way replication should suffice for high availability. In practice, this is not enough. When one datacenter is down (because of either an outage or planned maintenance), both surviving replicas must remain available for F1 to be able to commit transactions, because a Paxos commit must succeed on a majority of replicas. If a second datacenter goes down, the entire database becomes completely unavailable. Even a single machine failure or restart temporarily removes a second replica, causing unavailability for data hosted on that server.
+
+Spanner’s Paxos implementation designates one of the replicas as a leader. All transactional reads and commits must be routed to the leader replica. User transactions normally require at least two round trips to the leader (reads followed by a commit). Moreover, F1 servers usually perform an extra read as a part of transaction commit (to get old values for Change History, index updates, optimistic transaction timestamp verification, and referential integrity checks). Consequently, transaction latency is best when clients and F1 servers are co-located with Spanner leader replicas. We designate one of the datacenters as a preferred leader location. Spanner locates leader replicas in the preferred leader location whenever possible. Clients that perform heavy database modifications are usually deployed close to the preferred leader location. Other clients, including those that primarily run queries, can be deployed anywhere, and normally do reads against local F1 servers.
+
+写尽量在replica leader
+
+We have chosen to deploy our five read/write replicas with two each on the east and west coasts of the US, and the fifth centrally. With leaders on the east coast, commits require round trips to the other east coast datacenter, plus the central datacenter, which accounts for the 50ms minimum latency. We have chosen this deployment to maximize availability in the presence of large regional outages. Other F1 and Spanner instances could be deployed with closer replicas to reduce commit latency.
+
+# latency and throughput
+
+In our configuration, F1 users see read latencies of 5-10 ms and commit latencies of 50-150 ms. Commit latency is largely determined by network latency between datacenters. The Paxos algorithm allows a transaction to commit once a majority of voting Paxos replicas acknowledge the transaction. With five replicas, commits require a round trip from the leader to the two nearest replicas. Multi-group commits require 2PC, which typically doubles the minimum latency.
+
+Despite the higher database latency, overall user-facing latency for the main interactive AdWords web application averages about 200ms, which is similar to the preceding system running on MySQL. Our schema clustering and application coding strategies have successfully hidden the inherent latency of synchronous commits. Avoiding serial reads in client code accounts for much of that. In fact, while the average is similar, the MySQL application exhibited tail latency much worse than the same application on F1.
+
+For non-interactive applications that apply bulk updates, we optimize for throughput rather than latency. We typically structure such applications so they do small transactions, scoped to single Spanner directories when possible, and use parallelism to achieve high throughput. For example, we have one application that updates billions of rows per day, and we designed it to perform single-directory transactions of up to 500 rows each, running in parallel and aiming for 500 transactions per second. F1 and Spanner provide very high throughput for parallel writes like this and are usually not a bottleneck – our rate limits are usually chosen to protect downstream Change History consumers who can’t process changes fast enough.
+
+For query processing, we have mostly focused on functionality and parity so far, and not on absolute query performance. Small central queries reliably run in less than 10ms, and some applications do tens or hundreds of thousands of SQL queries per second. Large distributed queries run with latency comparable to MySQL. Most of the largest queries actually run faster in F1 because they can use more parallelism than MySQL, which can only parallelize up to the number of MySQL shards. In F1, such queries often see linear speedup when given more resources.
+
+
+Resource costs are usually higher in F1, where queries often use an order of magnitude more CPU than similar MySQL queries. MySQL stored data uncompressed on local disk, and was usually bottlenecked by disk rather than CPU, even with flash disks. F1 queries start from data compressed on disk and go through several layers, decompressing, pro- cessing, recompressing, and sending over the network, all of which have significant cost. Improving CPU efficiency here is an area for future work.
+
+# related work
+
+As a hybrid of relational and NoSQL systems, F1 is related to work in both areas. F1’s relational query execution techniques are similar to those described in the shared-nothing database literature, e.g., [12], with some key differences like the ignoring of interesting orders and the absence of copartitioned data. F1’s NoSQL capabilities share properties with other well-described scalable key-value stores including Bigtable [6], HBase [1], and Dynamo [11]. The hierarchical schema and clustering properties are similar to Megastore [3].
+
+Optimistic transactions have been used in previous systems including Percolator [19] and Megastore [3]. There is extensive literature on transaction, consistency and locking models, including optimistic and pessimistic transactions, such as [24] and [4].
+
+
+Prior work [15] also chose to mitigate the inherent latency of remote lookups though the use of asynchrony in query processing. However, due to the large volumes of data processed by F1, our system is not able to make the simplifying assumption that an unlimited number of asynchronous requests can be made at the same time. This complication, coupled with the high variability of storage operation latency, led to the out-of-order streaming design described in Section 8.3.
+
+MDCC [17] suggests some Paxos optimizations that could be applied to reduce the overhead of multi-participant transactions.
+
+Using Protocol Buffers as first class types makes F1, in part, a kind of object database [2]. The resulting simplified ORM results in a lower impedance mismatch for most client applications at Google, where Protocol Buffers are used pervasively. The hierarchical schema and clustering properties are similar to Megastore and ElasTraS [8]. F1 treats repeated fields inside protocol buffers like nested relations [21].
+
+# conclusion
+
+In recent years, conventional wisdom in the engineering community has been that if you need a highly scalable, high-throughput data store, the only viable option is to use a NoSQL key/value store, and to work around the lack of ACID transactional guarantees and the lack of conveniences like secondary indexes, SQL, and so on. When we sought a replacement for Google’s MySQL data store for the AdWords product, that option was simply not feasible: the complexity of dealing with a non-ACID data store in every part of our business logic would be too great, and there was simply no way our business could function without SQL queries. Instead of going NoSQL, we built F1, a distributed relational database system that combines high availability, the throughput and scalability of NoSQL systems, and the functionality, usability and consistency of traditional relational databases, including ACID transactions and SQL queries.
+
+Google’s core AdWords business is now running completely on F1. F1 provides the SQL database functionality that our developers are used to and our business requires. Unlike our MySQL solution, F1 is trivial to scale up by simply adding machines. Our low-level commit latency is higher, but by using a coarse schema design with rich column types and improving our client application coding style, the observable end-user latency is as good as before and the worst-case latencies have actually improved.
+
+F1 shows that it is actually possible to have a highly scalable and highly available distributed database that still provides all of the guarantees and conveniences of a traditional relational database.
+
+
+# acknowledgements
+
+We would like to thank the Spanner team, without whose great efforts we could not have built F1. We’d also like to thank the many developers and users across all AdWords teams who migrated their systems to F1, and who played a large role influencing and validating the design of this system. We also thank all former and newer F1 team members, including Michael Armbrust who helped write this paper, and Marcel Kornacker who worked on the early design of the F1 query engine.
