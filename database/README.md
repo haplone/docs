@@ -14,8 +14,13 @@ tidb executor 基于这个实现，postgre、spark sql 1都是基于这个实现
 https://zhuanlan.zhihu.com/p/3422091
 https://www.iteblog.com/archives/1679.html
 
-
+经典论文翻译导读之《Large-scale Incremental Processing Using Distributed Transactions and Notifications》
+http://www.importnew.com/2896.html
 
 * MySQL锁总结
 
 https://zhuanlan.zhihu.com/p/29150809
+
+
+分布式领域论文译序
+https://www.cnblogs.com/superf0sh/p/5754283.html?utm_source=itdadao&utm_medium=referral
