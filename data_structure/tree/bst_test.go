@@ -76,9 +76,9 @@ func getTarget() []int {
 	tl := []int{1, 2, 3, 4, 6, 30, 34, 56, 87, 89, 234, 345}
 	return tl
 }
-func getTree() *Node {
+func getTree() *BstNode {
 	list := []int{1, 345, 4, 34, 3, 6, 2, 6, 3, 56, 234, 6, 87, 89}
-	var n = Node{
+	var n = BstNode{
 		data: 30,
 	}
 	for _, i := range list {

@@ -1,13 +1,13 @@
 package tree
 
 //https://www.cnblogs.com/Dylansuns/p/6793032.html
-
-type Node struct {
+// binary sort tree
+type BstNode struct {
 	data                   int
-	parent, lchild, rchild *Node
+	parent, lchild, rchild *BstNode
 }
 
-func (n *Node) t() (r []int) {
+func (n *BstNode) t() (r []int) {
 	if n.lchild != nil {
 		r = append(r, n.lchild.t()...)
 	}
@@ -18,7 +18,7 @@ func (n *Node) t() (r []int) {
 	return
 }
 
-func (n *Node) Search(i int) *Node {
+func (n *BstNode) Search(i int) *BstNode {
 	//log.Printf("search node %d for %d\n", n.data, i)
 	switch {
 	case n.data == i:
@@ -31,12 +31,12 @@ func (n *Node) Search(i int) *Node {
 	return nil
 }
 
-func (n *Node) Add(i int) *Node {
+func (n *BstNode) Add(i int) *BstNode {
 	if n.data == i {
 		return n
 	}
 	c := n
-	var p *Node
+	var p *BstNode
 
 	for {
 		p = c
@@ -52,7 +52,7 @@ func (n *Node) Add(i int) *Node {
 			break
 		}
 	}
-	newNode := &Node{
+	newNode := &BstNode{
 		data:   i,
 		parent: p,
 	}
@@ -64,7 +64,7 @@ func (n *Node) Add(i int) *Node {
 	return newNode
 }
 
-func (n *Node) remove(i int) {
+func (n *BstNode) remove(i int) {
 	//log.Printf("remove node %d\n", i)
 	t := n.Search(i)
 	//log.Printf("get node %d when remove \n", t.data)
@@ -106,7 +106,7 @@ func (n *Node) remove(i int) {
 			t.lchild.parent = t.parent
 		}
 	case t.lchild != nil && t.rchild != nil:
-		var leftMaxNode *Node = t.lchild
+		var leftMaxNode *BstNode = t.lchild
 		for ; leftMaxNode.rchild != nil; {
 			leftMaxNode = leftMaxNode.rchild
 		}
