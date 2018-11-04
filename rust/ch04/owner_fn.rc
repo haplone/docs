@@ -1,0 +1,18 @@
+fn main(){
+	let s = String::from("Hello");
+	takes_ownership(s);
+
+//	println!("{}",s);
+
+	let x = 5;
+	makes_copy(x);
+	println!("{}",x);
+}
+
+fn takes_ownership(ss: String){
+	println!("take ownership: {}",ss);
+}
+
+fn makes_copy(ci: i32){
+	println!("make copy: {}",ci);
+}

@@ -1,0 +1,17 @@
+fn main(){
+	let s = String::from("hello rust");
+	let idx = first_world(&s);
+	
+	println!("the first ' ' in {} is {}",s,idx);
+}
+
+fn first_world(s: &String) -> usize {
+	let bytes = s.as_bytes();
+
+	for( i,&item ) in bytes.iter().enumerate(){
+		if item == b' '{
+			return i
+		}
+	}
+	return s.len();
+}

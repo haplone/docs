@@ -1,0 +1,20 @@
+fn main(){
+	let mut s1 = String::from("borrow");
+
+	let len = calculate_length(&s1);
+
+	println!("the len is {}",len);
+	println!("the string is {}",s1);
+
+	{
+		let s2 = &mut s1;
+	}
+	let s3 = &mut s1;
+
+//	let s4 = &mut s1;
+}
+
+fn calculate_length(s : &String) -> usize {
+//	s.push_str(",value");
+	s.len()
+}

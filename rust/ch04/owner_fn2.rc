@@ -1,0 +1,21 @@
+fn main(){
+	let s1 = gives_ownership();
+
+	let s2 = String::from("hello");
+
+	let s3 = takes_and_gives_back(s2);
+
+//	println!("could not get s2 : {}",s2);
+	println!("get s3 : {}",s3);
+}
+
+fn gives_ownership() -> String{
+	let ss = String::from("hello ownership");
+	println!("got new string : {}",ss);
+	ss
+}
+
+fn takes_and_gives_back(a: String) -> String{
+	println!("take and give back : {}",a);
+	a
+}
