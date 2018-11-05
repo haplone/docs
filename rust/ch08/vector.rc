@@ -1,0 +1,58 @@
+fn main(){
+	let v :Vec<i32> = Vec::new();
+
+	let v2 = vec![1,2,3];
+
+	let mut v3 : Vec<i32> = Vec::new();
+	v3.push(1);
+	v3.push(2);
+	v3.push(3);
+	
+
+	println!("v1 is {:?}",v);
+	println!("v2 is {:?}",v2);
+	println!("v3 is {:?}",v3);
+
+{
+	let third: &i32 = &v3[2];
+	let third2 : Option<&i32> = v3.get(2);
+
+	println!(" third value by [] is {}",third);
+	println!(" third value by get is {:?}",third2);
+
+//	let not_exist: &i32 = &v3[10];
+	let not_exist2: Option<&i32> = v3.get(10);
+
+//	println!(" value not exist is {}",not_exist);
+	println!(" value not exist by get is {:?}",not_exist2);
+}
+
+	v3.push(4);
+
+	println!(" vector 3 after push is {:?}",v3);
+
+	for i in &v3 {
+		println!("value is {}",i);
+	}
+
+	for i in &mut v3 {
+		*i +=10;
+	}
+	
+	println!("vector 3 after added is {:?}",v3);
+
+	let row = vec![
+		SpreadsheetCell::Int(3),
+		SpreadsheetCell::Text(String::from("rust")),
+		SpreadsheetCell:: Float(18.11),
+	];
+
+	println!(" spreadsheet row is {:?}",row);
+}
+
+#[derive(Debug)]
+enum SpreadsheetCell{
+	Int(i32),
+	Float(f64),
+	Text(String),
+}

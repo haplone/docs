@@ -1,0 +1,31 @@
+fn main(){
+	let data = "initial contents";
+	
+	let s = data.to_string();
+	println!("s is {}",s);
+
+	let s = "initial contents".to_string();
+	println!("s is {}",s);
+
+	let s = String::from("initial contents");
+	println!("s is {}",s);
+
+	let mut s = String::from("foo");
+	s.push_str("bar");
+	println!("s is {}",s);
+
+	let s2 = "bar";
+	s.push_str(s2);
+	println!("s2 is {}",s2);
+	println!("s is {}",s);
+
+	let location = "中国北京";
+
+	for c in location.chars(){
+		println!("char : {}",c);
+	}
+
+	for b in location.bytes(){
+		println!("byte : {}",b);
+	}
+}
