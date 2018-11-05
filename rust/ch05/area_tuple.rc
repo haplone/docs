@@ -1,0 +1,11 @@
+fn main(){
+	let rec = (30,50);
+
+	let area1 = area(rec);
+	
+	println!("the area is {}",area1);
+}
+
+fn area(rect: (u32,u32)) -> u32{
+	rect.0*rect.1
+}

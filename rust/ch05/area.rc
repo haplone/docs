@@ -1,0 +1,12 @@
+fn main(){
+	let width = 30;
+	let height = 50;
+
+	let area1 = area(width,height);
+
+	println!("the area is {}",area1);
+}
+
+fn area(width: u32,height: u32) -> u32{
+	return width*height;
+}

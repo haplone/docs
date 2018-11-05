@@ -1,0 +1,33 @@
+#[derive(Debug)]
+struct User{
+	username: String,
+	email: String,
+	sign_in_count: u64,
+	active: bool,
+}
+
+#[derive(Debug)]
+struct Color(i32,i32,i32);
+
+fn main(){
+	let u1 = User{
+		username: String::from("tongtong"),
+		email: String::from("buzhidao@tongtong.com"),
+		active: true,
+		sign_in_count: 1,
+	};
+
+	println!("user is {:?}",u1);
+
+	let u2 = User{
+		username: String::from("meimei"),
+		..u1
+	};
+
+	println!("user2 is {},email is {}",u2.username,u2.email);
+	
+	let red = Color(123,45,34);
+	
+	println!("color red is {:?}",red);
+
+}
