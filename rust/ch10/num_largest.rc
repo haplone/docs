@@ -1,0 +1,25 @@
+fn main(){
+	let mut number_list = vec![34,50,25,100,65];
+	let mut largest = number_list[0];
+
+	for &number in &number_list {
+		if number > largest {
+			largest = number;
+		}
+	}
+	number_list.push(120);
+	println!("the largest number is {}",largest);
+
+	println!("the largest number by fn is {}",get_largest(&number_list));
+}
+
+fn get_largest(list: &[i32]) -> i32{
+	let mut largest = list[0];
+	for &item in list.iter(){
+		if item > largest{
+			largest = item;
+		}
+	}
+
+	largest
+}

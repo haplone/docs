@@ -1,0 +1,19 @@
+fn largest<T :PartialOrd + Copy> (list: &[T]) -> T{
+	let mut l = list[0];
+	for &item in list.iter(){
+		if item > l {
+			l = item;
+		}
+	}
+	l
+}
+
+fn main(){
+	let number_list = vec![34,50,25,100,65];
+	let ln = largest(&number_list);
+	println!("the largest number in {:?} is {}",number_list,ln);
+
+	let char_list = vec!['y','m','a','q'];
+	let lc = largest(&char_list);
+	println!("the largest char in {:?} is {}",char_list,lc);
+}
