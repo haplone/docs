@@ -1,0 +1,24 @@
+use std::io;
+use std::io::Read;
+use std::fs::File;
+
+fn read_from_file() -> Result<String,io::Error> {
+	let mut f = File::open("result.rc")?;
+	let mut s = String::new();
+	f.read_to_string(&mut s)?;
+	Ok(s)
+}
+
+fn main(){
+	match read_from_file(){
+		Ok(s) => {
+			println!("content is {}",s);
+			"ok".to_string()
+		},
+		Err(e) => {
+			println!("error: {}",e);
+			"err".to_string()
+		},
+	};
+
+}
