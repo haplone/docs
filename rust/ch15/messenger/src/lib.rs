@@ -32,20 +32,27 @@ impl<'a,T> LimitTracker<'a,T>
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use std::cell::RefCell;
 	
 	struct MockMessenger{
-		sent_messengers: Vec<String>,
+		sent_messengers: RefCell<Vec<String>>,
 	}
 	
 	impl MockMessenger{
 		fn new() -> MockMessenger{
-			MockMessenger{ sent_messengers: vec![] }
+			MockMessenger{ sent_messengers: RefCell::new(vec![])}
 		}
 	}
 
 	impl Messenger for MockMessenger{
 		fn send(&self,messenge: &str){
-			self.sent_messengers.push(String::from(messenge));
+			self.sent_messengers.borrow_mut().push(String::from(messenge));
+			//let mut a = self.sent_messengers.borrow_mut();
+			//let mut b = self.sent_messengers.borrow_mut();
+			//a.push("a".to_string());
+			//b.push("b".to_string());
+			//let c = self.sent_messengers.borrow();
+			//let d = self.sent_messengers.borrow();
 		}
 	}
 	
@@ -56,6 +63,6 @@ mod tests {
 
 		limit_tracker.set_value(80);
 
-		assert_eq!(mock_messenger.sent_messengers.len(),1);
+		assert_eq!(mock_messenger.sent_messengers.borrow().len(),1);
 	}
 }
