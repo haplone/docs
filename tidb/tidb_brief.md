@@ -16,6 +16,15 @@ spark sql + thrift server ==> kudu ==> cockroachdb ==> tidb
 * kudu 底层也是raft + lsm ，遇到的问题是region数量，sql支持依赖impala
 * cockroach 啥都好，还json支持非常好；but ... join性能差，使用PostgreSQL
 
+![kudu position](../kudu/kudu_hdfs_hbase.jpg)
 
 
-![Go 在 TiDB 的实践 ](http://www.sohu.com/a/220085058_657921)
+![kudu architecture](../kudu/kudu_architecture.png)
+
+![how kudu write data](../kudu/kudu_write_data.jpeg)
+
+
+
+[Go 在 TiDB 的实践](http://www.sohu.com/a/220085058_657921)
+
+[Percolator 和 TiDB 事务算法](https://pingcap.com/blog-cn/percolator-and-txn/)
