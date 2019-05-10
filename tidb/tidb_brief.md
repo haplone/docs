@@ -36,7 +36,7 @@ spark sql + thrift server ==> kudu ==> cockroachdb ==> tidb
 
 我们日常说的tidb其实是包含3大组件： tidb、pd、tikv。
 
-* `tidb`: 负责sql解析、计算；golang实现
+* `tidb`: SQL layer，使用的mysql语法;负责sql解析、计算；golang实现
 * `pd`: 负责kv的调度，统一授时；golang实现
 * `tikv`: 基于raft实现的统一kv存储；数据最终存储的地方；rust实现
 
@@ -64,11 +64,30 @@ TiKV 也是一个非常复杂的系统，这块我们会重点介绍，主要包
 
 ### pd
 
-PD 用来负责整个 TiKV 的调度，我们会详细的介绍 PD 内部是如何使用 etcd 来进行元数据存取和高可用支持，也会介绍 PD 如何跟 TiKV 交互，如何生成全局的 ID 以及 timestamp。
+PD主要负责元数据的管理。PD的主要作用：
 
-最后，我们会详细的介绍 PD 提供的 scheduler，以及不同的 scheudler 所负责的事情，让大家能通过配置 scheduler 来让系统更加的稳定。
+* 管理TiKV(一段范围key的数据)，通过PD,可以获取每一段数据具体的位置；
+* F1中提到的授时，即用于保证分布式数据库的外部一致性。
 
+![pd archtecture](pd_archtecture.jpeg)
 
+### tidb
+
+![tidb architecture](tidb_architure.jpg)
+
+![tidb sql layer](tidb_sql_layer.jpg)
+
+SQL本身实际上就是一串字符串，所以我们首先会有一个解析器。语法解析器(Parser)的实现本身不难，但是却极其繁琐。这主要是因为Mysql比较奇葩的语法，Mysql在SQL标准的基础上增加了很多自己的语法，因此pingcap这一模块的实现耗时极长，有一两个月之久。
+
+但由于Parser只做语法规则的检查，SQL语句本身的逻辑却没法保证，因此在Parser后紧跟了Validate模块来检查SQL语句的逻辑意义。
+
+在Validate模块后是一个类型推断。之所以有这个模块，主要是因为同一个SQL语句在不同的上下文环境有不同的语义，因此我们不得不根据上下文来进行类型推断。
+
+接下来是优化器，这个模块pingcap有一个专门的团队来负责。优化器主要分为逻辑优化器和物理优化器。逻辑优化器主要是基于关系代数，比如子查询去关联等。然后是和底层的物理存储层打交道的物理优化器，索引等就是在这一块实现的。
+
+后面还有一个分布式执行器，它主要是利用MPP模型来实现的，这也是分布式数据库比单机数据库要快的主要原因。
+
+## 引用
 
 [Go 在 TiDB 的实践](http://www.sohu.com/a/220085058_657921)
 
