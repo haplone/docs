@@ -14,7 +14,7 @@ spark sql + thrift server ==> kudu ==> cockroachdb ==> tidb
 
 * spark sql + thrift server 跑批强悍，但频繁查询的场景满足不了
 * kudu 底层也是raft + lsm ，遇到的问题是region数量，sql支持依赖impala
-* cockroach 啥都好，还json支持非常好；but ... join性能差，使用PostgreSQL
+* cockroach 啥都好，还json支持非常好；but ... join性能差，使用PostgreSQL语法
 
 #### kudu
 ![kudu position](../kudu/kudu_hdfs_hbase.jpg)
@@ -28,9 +28,26 @@ spark sql + thrift server ==> kudu ==> cockroachdb ==> tidb
 
 ![cockroach db](../cockroachdb/media/architecture.png)
 
-## what is tidb
+## tidb architecture
+
+![tidb all architecture](tidb_all_architecture.jpeg)
+
+![how we use](tidb_all_architecture.png)
+
+我们日常说的tidb其实是包含3大组件： tidb、pd、tikv。
+
+* `tidb`: 负责sql解析、计算；golang实现
+* `pd`: 负责kv的调度，统一授时；golang实现
+* `tikv`: 基于raft实现的统一kv存储；数据最终存储的地方；rust实现
+
+### tikv
+
+![tikv overview](tikv_overview.jpeg)
+
 
 
 [Go 在 TiDB 的实践](http://www.sohu.com/a/220085058_657921)
 
-[Percolator 和 TiDB 事务算法](https://pingcap.com/blog-cn/percolator-and-txn/)
+[kudu overview](https://kudu.apache.org/overview.html)
+
+[Kudu:支持快速分析的新型Hadoop存储系统](https://bigdata.163.com/product/article/1)
