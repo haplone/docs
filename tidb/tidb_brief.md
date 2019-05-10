@@ -44,7 +44,9 @@ spark sql + thrift server ==> kudu ==> cockroachdb ==> tidb
 
 ![tikv overview](tikv_overview.jpeg)
 
-![tikv overview2](tikv_architecture.jpg)
+换个大家熟悉的角度看
+
+![tikv overview2](tikv_architure.jpg)
 
 Tikv简单说，就是使用raft在单机rocksdb的基础上，做一个分布式的kv存储。以region为单位对数据分组后，通过raft保证数据的外部一致性。
 
