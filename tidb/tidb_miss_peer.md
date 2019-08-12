@@ -2,7 +2,7 @@
 
 近日tidb集群抖动严重，如果grafana的监控发现，有大量的raft group出现缺少副本的情况。就是下图显示的`Region Health`中最多的时候有2万7千个region出现`miss_peer_region_count`
 
-[]
+![miss_peer_region_count](miss_peer_region_count.png)
 
 ## miss_peer_region_count 出处
 
