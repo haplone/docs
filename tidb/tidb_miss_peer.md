@@ -1,8 +1,20 @@
 # tidb grafana监控发现大量raft group缺少副本问题跟踪
 
-近日tidb集群抖动严重，如果grafana的监控发现，有大量的raft group出现缺少副本的情况。就是下图显示的`Region Health`中最多的时候有2万7千个region出现`miss_peer_region_count`
+近日通过grafana监控发现，有大量的raft group出现缺少副本的情况。就是下图显示的`Region Health`中最多的时候有2万7千个region出现`miss_peer_region_count`
+
 
 ![miss_peer_region_count](miss_peer_region_count.png)
+
+
+## summary
+
+这个miss_peer_region_count统计的是raft group中副本个数有缺失的region数量。我们集群中缺失这么多很危险。当时看着这监控，真心慌慌。所以现在整理了下。
+
+根据tidb架构，pd是无状态的，tikv将自身的node和region信息上报pd，pd对其进行管理。pd对tikv的管理主要是通过`Scheduler`、`Operator`、`OperatorStep`进行的。
+
+![pd_archtecture](pd_archtecture.jpeg)
+
+
 
 ## miss_peer_region_count 出处
 
@@ -620,5 +632,182 @@ func (r *ReplicaChecker) Check(region *core.RegionInfo) *Operator {
 ```
 
 
+### scheduler
+
+
+```go
+// server/handler.go
+// AddScheduler adds a scheduler.
+func (h *Handler) AddScheduler(name string, args ...string) error {
+	c, err := h.getCoordinator()
+	if err != nil {
+		return err
+	}
+	s, err := schedule.CreateScheduler(name, c.limiter, args...)
+	if err != nil {
+		return err
+	}
+	log.Info("create scheduler", zap.String("scheduler-name", s.GetName()))
+	if err = c.addScheduler(s, args...); err != nil {
+		log.Error("can not add scheduler", zap.String("scheduler-name", s.GetName()), zap.Error(err))
+	} else if err = h.opt.persist(c.cluster.kv); err != nil {
+		log.Error("can not persist scheduler config", zap.Error(err))
+	}
+	return err
+}
+```
+
+```go
+// server/coordinator.go
+
+func (c *coordinator) run() {
+	ticker := time.NewTicker(runSchedulerCheckInterval)
+	defer ticker.Stop()
+	log.Info("coordinator starts to collect cluster information")
+	for {
+		if c.shouldRun() {
+			log.Info("coordinator has finished cluster information preparation")
+			break
+		}
+		select {
+		case <-ticker.C:
+		case <-c.ctx.Done():
+			log.Info("coordinator stops running")
+			return
+		}
+	}
+	log.Info("coordinator starts to run schedulers")
+
+	k := 0
+	scheduleCfg := c.cluster.opt.load()
+	for _, schedulerCfg := range scheduleCfg.Schedulers {
+		if schedulerCfg.Disable {
+			scheduleCfg.Schedulers[k] = schedulerCfg
+			k++
+			log.Info("skip create scheduler", zap.String("scheduler-type", schedulerCfg.Type))
+			continue
+		}
+		s, err := schedule.CreateScheduler(schedulerCfg.Type, c.limiter, schedulerCfg.Args...)
+		if err != nil {
+			log.Fatal("can not create scheduler", zap.String("scheduler-type", schedulerCfg.Type), zap.Error(err))
+		}
+		log.Info("create scheduler", zap.String("scheduler-name", s.GetName()))
+		if err = c.addScheduler(s, schedulerCfg.Args...); err != nil {
+			log.Error("can not add scheduler", zap.String("scheduler-name", s.GetName()), zap.Error(err))
+		}
+
+		// only record valid scheduler config
+		if err == nil {
+			scheduleCfg.Schedulers[k] = schedulerCfg
+			k++
+		}
+	}
+
+	// remove invalid scheduler config and persist
+	scheduleCfg.Schedulers = scheduleCfg.Schedulers[:k]
+	if err := c.cluster.opt.persist(c.cluster.kv); err != nil {
+		log.Error("cannot persist schedule config", zap.Error(err))
+	}
+
+	c.wg.Add(1)
+	go c.patrolRegions()
+}
+
+
+func (c *coordinator) addScheduler(scheduler schedule.Scheduler, args ...string) error {
+	c.Lock()
+	defer c.Unlock()
+
+	if _, ok := c.schedulers[scheduler.GetName()]; ok {
+		return errSchedulerExisted
+	}
+
+	s := newScheduleController(c, scheduler)
+	if err := s.Prepare(c.cluster); err != nil {
+		return err
+	}
+
+	c.wg.Add(1)
+	go c.runScheduler(s)
+	c.schedulers[s.GetName()] = s
+	c.cluster.opt.AddSchedulerCfg(s.GetType(), args)
+
+	return nil
+}
+
+func (c *coordinator) runScheduler(s *scheduleController) {
+	defer logutil.LogPanic()
+	defer c.wg.Done()
+	defer s.Cleanup(c.cluster)
+
+	timer := time.NewTimer(s.GetInterval())
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			timer.Reset(s.GetInterval())
+			if !s.AllowSchedule() {
+				continue
+			}
+			opInfluence := schedule.NewOpInfluence(c.getOperators(), c.cluster)
+			if op := s.Schedule(c.cluster, opInfluence); op != nil {
+				c.addOperator(op...)
+			}
+
+		case <-s.Ctx().Done():
+			log.Info("scheduler has been stopped",
+				zap.String("scheduler-name", s.GetName()),
+				zap.Error(s.Ctx().Err()))
+			return
+		}
+	}
+}
+
+func (c *coordinator) addOperator(ops ...*schedule.Operator) bool {
+	c.Lock()
+	defer c.Unlock()
+
+	for _, op := range ops {
+		if !c.checkAddOperator(op) {
+			operatorCounter.WithLabelValues(op.Desc(), "canceled").Inc()
+			c.opRecords.Put(op, pdpb.OperatorStatus_CANCEL)
+			return false
+		}
+	}
+	for _, op := range ops {
+		c.addOperatorLocked(op)
+	}
+
+	return true
+}
+
+func (c *coordinator) addOperatorLocked(op *schedule.Operator) bool {
+	regionID := op.RegionID()
+
+	log.Info("add operator", zap.Uint64("region-id", regionID), zap.Reflect("operator", op))
+
+	// If there is an old operator, replace it. The priority should be checked
+	// already.
+	if old, ok := c.operators[regionID]; ok {
+		log.Info("replace old operator", zap.Uint64("region-id", regionID), zap.Reflect("operator", old))
+		operatorCounter.WithLabelValues(old.Desc(), "replaced").Inc()
+		c.opRecords.Put(old, pdpb.OperatorStatus_REPLACE)
+		c.removeOperatorLocked(old)
+	}
+
+	c.operators[regionID] = op
+	c.limiter.UpdateCounts(c.operators)
+
+	if region := c.cluster.GetRegion(op.RegionID()); region != nil {
+		if step := op.Check(region); step != nil {
+			c.sendScheduleCommand(region, step)
+		}
+	}
+
+	operatorCounter.WithLabelValues(op.Desc(), "create").Inc()
+	return true
+}
+```
 
 
