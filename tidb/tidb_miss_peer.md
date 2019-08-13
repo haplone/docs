@@ -10,9 +10,11 @@
 
 这个miss_peer_region_count统计的是raft group中副本个数有缺失的region数量。我们集群中缺失这么多很危险。当时看着这监控，真心慌慌。所以现在整理了下。
 
-根据tidb架构，pd是无状态的，tikv将自身的node和region信息上报pd，pd对其进行管理。pd对tikv的管理主要是通过`Scheduler`、`Operator`、`OperatorStep`进行的。
+根据tidb架构，pd是无状态的，tikv将自身的node和region信息上报pd，pd对其进行管理。pd对tikv的管理主要是通过`Scheduler`、`OpInfluence`、`Operator`、`OperatorStep`进行的。
 
 ![pd_archtecture](pd_archtecture.jpeg)
+
+
 
 
 
