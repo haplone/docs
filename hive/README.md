@@ -10,3 +10,5 @@
 [Hive SQL 编译过程详解](https://my.oschina.net/leejun2005/blog/267219)
 
 [hive design docs](https://cwiki.apache.org/confluence/display/Hive/DesignDocs)
+
+[ Hive metastore源码阅读（一） ](https://www.cnblogs.com/yangsy0915/p/7367717.html)
