@@ -17,3 +17,7 @@ https://yq.aliyun.com/articles/699919
 
 Apache Spark Delta Lake 删除使用及实现原理代码解析
 https://yq.aliyun.com/articles/719515
+
+Delta Lake 实践（离线篇)
+https://blog.csdn.net/lsshlsw/article/details/103553289
+主要时添加sql的支持
