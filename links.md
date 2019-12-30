@@ -7,3 +7,5 @@ https://www.cnblogs.com/DataPipeline2018/p/11434893.html
 []When to use Cassandra, MongoDB, HBase, Accumulo and MySQL(https://blog.ippon.tech/use-cassandra-mongodb-hbase-accumulo-mysql/)
 
 [](https://www.baeldung.com/jdo)
+test
+
