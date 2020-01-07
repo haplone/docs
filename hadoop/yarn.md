@@ -1,5 +1,7 @@
 # 原理
 
+[Paper Reading:Apache Hadoop YARN 另一种资源协调者](https://zhuanlan.zhihu.com/p/95555133)
+
 [YARN架构设计详解](https://www.cnblogs.com/wcwen1990/p/6737985.html)
 
 
