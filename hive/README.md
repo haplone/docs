@@ -12,3 +12,6 @@
 [hive design docs](https://cwiki.apache.org/confluence/display/Hive/DesignDocs)
 
 [ Hive metastore源码阅读（一） ](https://www.cnblogs.com/yangsy0915/p/7367717.html)
+
+简单描述：架构、sql执行过程、hdfs上文件存储格式、压缩算法、数据倾斜的处理方式（group by , join)
+[一文弄懂Hive基本架构和原理](https://blog.csdn.net/oTengYue/article/details/91129850)
