@@ -1,5 +1,6 @@
 
 
+# 原理
 
 [调研系列第五篇：antlr以及hive的parse执行入口](https://www.cnblogs.com/serendipity/articles/3738138.html)
 
@@ -15,3 +16,13 @@
 
 简单描述：架构、sql执行过程、hdfs上文件存储格式、压缩算法、数据倾斜的处理方式（group by , join)
 [一文弄懂Hive基本架构和原理](https://blog.csdn.net/oTengYue/article/details/91129850)
+
+good
+[Hive SQL执行计划深度解析](https://blog.csdn.net/moon_yang_bj/article/details/31744381)
+
+## practice
+
+基于hive server2进行presto、spark sql的统一入口
+使用BeanconServer进行sql采集
+几个定制性能优化
+[SQL on Hadoop 在快手大数据平台的实践与优化](https://www.infoq.cn/article/BN9cJjg1t-QSWE6fqkoR)
