@@ -5,3 +5,20 @@
 * javascript
 * java 
 
+
+## big data stack
+
+### doc reading status
+
+* hadoop ing
+* zookeeper
+* hive
+* hbase
+* spark
+* flink
+* tidb
+* presto
+* calcite
+* leveldb
+
+### paper reading
