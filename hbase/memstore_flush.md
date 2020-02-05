@@ -1,4 +1,7 @@
 
+
+[HBase内存管理之MemStore进化论](http://hbasefly.com/2019/10/18/hbase-memstore-evolution/)
+
 范欣欣
 [HBase – Memstore Flush深度解析](http://hbasefly.com/2016/03/23/hbase-memstore-flush/)
 
