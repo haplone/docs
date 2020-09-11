@@ -1,0 +1,48 @@
+{
+    "created_time": "2020-09-11T00:54:59Z",
+    "files": [
+        {
+            "attachment_folder": "",
+            "attachments": [
+            ],
+            "created_time": "2020-09-10T10:38:56Z",
+            "modified_time": "2020-09-10T10:42:00Z",
+            "name": "hudi_introduce.md",
+            "tags": [
+            ]
+        },
+        {
+            "attachment_folder": "",
+            "attachments": [
+            ],
+            "created_time": "2020-09-11T01:11:20Z",
+            "modified_time": "2020-09-11T01:16:03Z",
+            "name": "hudi_uber_talk.md",
+            "tags": [
+            ]
+        },
+        {
+            "attachment_folder": "",
+            "attachments": [
+            ],
+            "created_time": "2020-09-11T01:13:30Z",
+            "modified_time": "2020-09-11T01:14:09Z",
+            "name": "hudi_deltastreamer.md",
+            "tags": [
+            ]
+        },
+        {
+            "attachment_folder": "",
+            "attachments": [
+            ],
+            "created_time": "2020-09-11T01:14:40Z",
+            "modified_time": "2020-09-11T01:15:53Z",
+            "name": "hudi_spark_structed_streaming.md",
+            "tags": [
+            ]
+        }
+    ],
+    "sub_directories": [
+    ],
+    "version": "1"
+}
