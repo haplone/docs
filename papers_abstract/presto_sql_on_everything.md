@@ -267,161 +267,114 @@ In this section, we describe a few important query processing optimizations that
 
 ### A. Working with the JVM
 
-Presto is implemented in Java and runs on the Hotspot
-Java Virtual Machine (JVM). Extracting the best possible
-performance out of the implementation requires playing to
-the strengths and limitations of the underlying platform.
-Performance-sensitive code such as data compression or
-checksum algorithms can benefit from specific optimizations
-or CPU instructions. While there is no application-level mech-
-anism to control how the JVM Just-In-Time (JIT) compiler
-generates machine code, it is possible to structure the code
-so that it can take advantage of optimizations provided by
-the JIT compiler, such as method inlining, loop unrolling, and
-intrinsics. We are exploring the use of Graal [22] in scenarios
-where the JVM is unable to generate optimal machine code,
-such as 128-bit math operations.
-The choice of garbage collection (GC) algorithm can have
-dramatic effects on application performance and can even
-influence application implementation choices. Presto uses the
-G1 collector, which deals poorly with objects larger than a
-certain size. To limit the number of these objects, Presto avoids
-allocating objects or buffers bigger than the ‘humongous’
-threshold and uses segmented arrays if necessary. Large and
-highly linked object graphs can also be problematic due to
-maintenance of remembered set structures in G1 [10]. Data
-structures in the critical path of query execution are imple-
-mented over flat memory arrays to reduce reference and object
-counts and make the job of the GC easier. For example, the
-HISTOGRAM aggregation stores the bucket keys and counts
-for all groups in a set of flat arrays and hash tables instead of
-maintaining independent objects for each histogram.
+Presto is implemented in Java and runs on the Hotspot Java Virtual Machine (JVM). Extracting the best possible performance out of the implementation requires playing to the strengths and limitations of the underlying platform. Performance-sensitive code such as data compression or checksum algorithms can benefit from specific optimizations or CPU instructions. While there is no application-level mechanism to control how the `JVM Just-In-Time (JIT) compiler` generates machine code, it is possible to structure the code so that it can take advantage of optimizations provided by the JIT compiler, such as `method inlining, loop unrolling, and intrinsics`. We are exploring the use of Graal in scenarios where the JVM is unable to generate optimal machine code, such as 128-bit math operations.
+
+The choice of garbage collection (GC) algorithm can have dramatic effects on application performance and can even influence application implementation choices. Presto uses the G1 collector, which deals poorly with objects larger than a certain size. To limit the number of these objects, Presto avoids allocating objects or buffers bigger than the ‘humongous’ threshold and uses `segmented arrays` if necessary. Large and highly linked object graphs can also be problematic due to maintenance of remembered set structures in G1 . Data structures in the critical path of query execution are implemented over `flat memory arrays` to reduce reference and object counts and make the job of the GC easier. For example, the HISTOGRAM aggregation stores the bucket keys and counts for all groups in a set of flat arrays and hash tables instead of maintaining independent objects for each histogram.
 
 ### B. Code Generation
 
-One of the main performance features of the engine is code
-generation, which targets JVM bytecode. This takes two forms:
-1) Expression Evaluation: The performance of a query en-
-gine is determined in part by the speed at which it can evaluate
-complex expressions. Presto contains an expression interpreter
-that can evaluate arbitrarily complex expressions that we use
-for tests, but is much too slow for production use evaluating
-billions of rows. To speed this up, Presto generates bytecode
-to natively deal with constants, function calls, references to
-variables, and lazy or short-circuiting operations.
-2) Targeting JIT Optimizer Heuristics: Presto generates
-bytecode for several key operators and operator combinations.
-The generator takes advantage of the engine’s superior knowl-
-edge of the semantics of the computation to produce bytecode
-that is more amenable to JIT optimization than that of a generic processing loop. There are three main behaviors that
-the generator targets:
+One of the main performance features of the engine is code generation, which targets JVM bytecode. This takes two forms:
 
+#### 1) Expression Evaluation: 
 
-Since the engine switches between different splits from
-distinct task pipelines every quanta (Section IV-F1), the JIT
-would fail to optimize a common loop based implementa-
-tion since the collected profiling information for the tight
-processing loop would be polluted by other tasks or queries.
-• Even within the processing loop for a single task pipeline,
-the engine is aware of the types involved in each com-
-putation and can generate unrolled loops over columns.
-Eliminating target type variance in the loop body causes
-the profiler to conclude that call sites are monomorphic,
-allowing it to inline virtual methods.
-• As the bytecode generated for every task is compiled into
-a separate Java class, each can be profiled independently
-by the JIT optimizer. In effect, the JIT optimizer further
-adapts a custom program generated for the query to the data
-actually processed. This profiling happens independently at
-each task, which improves performance in environments
-where each task processes a different partition of the data.
-Furthermore, the performance profile can change over the
-lifetime of the task as the data changes (e.g., time-series
-data or logs), causing the generated code to be updated.
+The performance of a query engine is determined in part by the speed at which it can `evaluate complex expressions`. Presto contains an expression interpreter that can evaluate arbitrarily complex expressions that we use for tests, but is much too slow for production use evaluating billions of rows. To speed this up, Presto generates bytecode to natively deal with `constants, function calls, references to variables, and lazy or short-circuiting operations`.
 
+#### 2) Targeting JIT Optimizer Heuristics: 
 
-Generated bytecode also benefits from the second order ef-
-fects of inlining. The JVM is able to broaden the scope of
-optimizations, auto-vectorize larger parts of the computation,
-and can take advantage of frequency-based basic block layout
-to minimize branches. CPU branch prediction also becomes far
-more effective [7]. Bytecode generation improves the engine’s
-ability to store intermediate results in registers or caches rather
-than in memory [16].
+Presto generates bytecode for several key operators and operator combinations. The generator takes advantage of the engine’s superior knowledge of the semantics of the computation to produce bytecode that is more amenable to JIT optimization than that of a generic processing loop. There are three main behaviors that the generator targets:
+
+• Since the engine switches between different splits from distinct task pipelines every quanta (Section IV-F1), the JIT would fail to optimize a common loop based implementation since the collected profiling information for the tight processing loop would be polluted by other tasks or queries.
+
+• Even within the processing loop for a single task pipeline, the engine is aware of the types involved in each computation and can generate unrolled loops over columns. Eliminating target type variance in the loop body causes the profiler to conclude that call sites are monomorphic, allowing it to inline virtual methods.
+
+• As the bytecode generated for every task is compiled into a separate Java class, each can be profiled independently by the JIT optimizer. In effect, the JIT optimizer further adapts a custom program generated for the query to the data actually processed. This profiling happens independently at each task, which improves performance in environments where each task processes a different partition of the data. Furthermore, the performance profile can change over the lifetime of the task as the data changes (e.g., time-series data or logs), causing the generated code to be updated.
+
+Generated bytecode also benefits from the second order effects of inlining. The JVM is able to broaden the scope of optimizations, auto-vectorize larger parts of the computation, and can take advantage of frequency-based basic block layout to minimize branches. CPU branch prediction also becomes far more effective . Bytecode generation improves the engine’s ability to store intermediate results in registers or caches rather than in memory .
 
 
 ### C. File Format Features
 
-Scan operators invoke the Connector API with leaf split
-information and receive columnar data in the form of Pages.
-A page consists of a list of Blocks, each of which is a column
-with a flat in-memory representation. Using flat memory data
-structures is important for performance, especially for complex
-types. Pointer chasing, unboxing, and virtual method calls add
-significant overhead to tight loops.
-Connectors such Hive and Raptor take advantage of specific
-file format features where possible [20]. Presto ships with
-custom readers for file formats that can efficiently skip data
-sections by using statistics in file headers/footers (e.g., min-
-max range headers and Bloom filters). The readers can convert
-certain forms of compressed data directly into blocks, which
-can be efficiently operated upon by the engine (Section V-E).
-Figure 5 shows the layout of a page with compressed encod-
-ing schemes for each column. Dictionary-encoded blocks are
-very effective at compressing low-cardinality sections of data
-and run-length encoded (RLE) blocks compress repeated data.
-Several pages may share a dictionary, which greatly improves
-memory efficiency. A column in an ORC file can use a single
-dictionary for an entire ‘stripe’ (up to millions of rows).
+Scan operators invoke the Connector API with leaf split information and receive columnar data in the form of Pages. `A page consists of a list of Blocks, each of which is a column with a flat in-memory representation`. Using flat memory data structures is important for performance, especially for complex types. Pointer chasing, unboxing, and virtual method calls add significant overhead to tight loops.
+
+Connectors such Hive and Raptor take advantage of specific file format features where possible . Presto ships with custom readers for file formats that can efficiently skip data sections by using statistics in file headers/footers (e.g., minmax range headers and Bloom filters). The `readers can convert certain forms of compressed data directly into blocks`, which can be efficiently operated upon by the engine (Section V-E). 
+
+Figure 5 shows the layout of a page with compressed encoding schemes for each column. `Dictionary-encoded` blocks are very effective at compressing low-cardinality sections of data and run-length encoded (RLE) blocks compress repeated data.
+Several pages may share a dictionary, which greatly improves memory efficiency. A column in an `ORC file can use a single dictionary for an entire ‘stripe’ (up to millions of rows)`.
 
 ### D. Lazy Data Loading
 
-
-Presto supports lazy materialization of data. This functionality
-can leverage the columnar, compressed nature of file formats
-such as ORC, Parquet, and RCFile. Connectors can generate
-lazy blocks, which read, decompress, and decode data only
-when cells are actually accessed. Given that a large fraction
-of CPU time is spent decompressing and decoding and that it
-is common for filters to be highly selective, this optimization
-is highly effective when columns are infrequently accessed.
-Tests on a sample of production workload from the Batch
-ETL use case show that lazy loading reduces data fetched by
-78%, cells loaded by 22% and total CPU time by 14%.
+Presto supports lazy materialization of data. This functionality can leverage the columnar, compressed nature of file formats such as ORC, Parquet, and RCFile. Connectors can generate lazy blocks, which read, decompress, and decode data only when cells are actually accessed. Given that a large fraction of CPU time is spent decompressing and decoding and that it is common for filters to be highly selective, this optimization is highly effective when columns are infrequently accessed. Tests on a sample of production workload from the Batch ETL use case show that lazy loading reduces data fetched by 78%, cells loaded by 22% and total CPU time by 14%.
 
 ### E. Operating on Compressed Data
 
-Presto operates on compressed data (i.e. dictionary and run-
-length-encoded blocks) sourced from the connector wherever
-possible. Figure 5 shows how these blocks are structured
-within a page. When a page processor evaluating a transfor-
-mation or filter encounters a dictionary block, it processes all
-of the values in the dictionary (or the single value in a run-
-length-encoded block). This allows the engine to process the
-entire dictionary in a fast unconditional loop. In some cases,
-there are more values present in the dictionary than rows in
-the block. In this scenario the page processor speculates that
-the un-referenced values will be used in subsequent blocks.
-The page processor keeps track of the number of real rows
-produced and the size of the dictionary, which helps measure
-the effectiveness of processing the dictionary as compared to
-processing all the indices. If the number of rows is larger than
-the size of the dictionary it is likely more efficient to process
-the dictionary instead. When the page processor encounters a
-new dictionary in the sequence of blocks, it uses this heuristic
-to determine whether to continue speculating.
-Presto also leverages dictionary block structure when build-
-ing hash tables (e.g., joins or aggregations). As the indices
-are processed, the operator records hash table locations for
-every dictionary entry in an array. If the entry is repeated
-for a subsequent index, it simply re-uses the location rather
-than re-computing it. When successive blocks share the same dictionary, the page processor retains the array to further
-reduce the necessary computation.
-Presto also produces intermediate compressed results during
-execution. The join processor, for example, produces dictio-
-nary or run-length-encoded blocks when it is more efficient to
-do so. For a hash join, when the probe side of the join looks
-up keys in the hash table, it records value indices into an
-array rather than copying the actual data. The operator simply
-produces a dictionary block where the index list is that array,
-and the dictionary is a reference to the block in the hash table.
+Presto operates on compressed data (i.e. dictionary and run-length-encoded blocks) sourced from the connector wherever possible. Figure 5 shows how these blocks are structured within a page. When a page processor evaluating a transformation or filter encounters a dictionary block, it processes all of the values in the dictionary (or the single value in a run-length-encoded block). This allows the engine to process the entire dictionary in a fast unconditional loop. In some cases, there are more values present in the dictionary than rows in the block. In this scenario the page processor speculates that the un-referenced values will be used in subsequent blocks. The page processor keeps track of the number of real rows produced and the size of the dictionary, which helps measure the effectiveness of processing the dictionary as compared to processing all the indices. If the number of rows is larger than the size of the dictionary it is likely more efficient to process the dictionary instead. When the page processor encounters a
+new dictionary in the sequence of blocks, it uses this heuristic to determine whether to continue speculating. Presto also leverages dictionary block structure when building hash tables (e.g., joins or aggregations). As the indices are processed, the operator records hash table locations for every dictionary entry in an array. If the entry is repeated for a subsequent index, it simply re-uses the location rather than re-computing it. When successive blocks share the same dictionary, the page processor retains the array to further reduce the necessary computation.
+
+Presto also produces intermediate compressed results during execution. The join processor, for example, produces dictionary or run-length-encoded blocks when it is more efficient to do so. For a hash join, when the probe side of the join looks up keys in the hash table, it records value indices into an array rather than copying the actual data. The operator simply produces a dictionary block where the index list is that array, and the dictionary is a reference to the block in the hash table.
+
+## VI. P ERFORMANCE
+
+In this section, we present performance results that demonstrate the impact of some of the main design decisions described in this paper.
+
+### A. Adaptivity
+
+
+Within Facebook, we run several different connectors in production to allow users to process data stored in various internal systems. Table 1 outlines the connectors and deployments that are used to support the use cases outlined in Section II.
+
+To demonstrate how Presto adapts to connector characteristics, we compare runtimes for queries from the TPC-DS benchmark at scale factor 30TB. Presto is capable of running all TPC-DS queries, but for this experiment we select a low-memory subset that does not require spilling.
+
+We use Presto version 0.211 with internal variants of the Hive/HDFS and Raptor connectors. Raptor is a shared-nothing storage engine designed for Presto. It uses MySQL for metadata and stores data on local flash disks in ORC format. Raptor supports complex data organization (sorting, bucketing, and temporal columns), but for this experiment our data is randomly partitioned. The Hive connector uses an internal service similar to the Hive Metastore and accesses files encoded in an ORC-like format on a remote distributed filesystem that is functionally similar to HDFS (i.e., a shared-storage architecture). Performance characteristics of these connector variants are similar to deployments on public cloud providers.
+
+Every query is run with three settings on a 100-node test cluster: (1) Data stored in Raptor with table shards randomly distributed between nodes. (2) Data stored in Hive/HDFS with no statistics. (3) Data stored in Hive/HDFS along with table and column statistics. Presto’s optimizer can make cost-based decisions about join order and join strategy when these statistics are available. Every node is configured with a 28-core Intel TM Xeon TM E5-2680 v4 CPU running at 2.40GHz, 1.6TB of flash storage and 256GB of DDR4 RAM.
+
+Figure 6 shows that Presto query runtime is greatly impacted by the characteristics of connectors. With no change to the query or cluster configuration, Presto is able to adapt to the connector by taking advantage of its characteristics, including throughput,   latency, and the availability of statistics. It also demonstrates how a single Presto cluster can serve both as a traditional enterprise data warehouse (that data must be ingested into) and also a query engine over a Hadoop data warehouse. Data engineers at Facebook frequently use Presto to perform exploratory analysis over the Hadoop warehouse and then load aggregate or frequently-accessed data Time results (min after period start) into Raptor for faster analysis and low-latency dashboards.
+
+### B. Flexibility
+
+Presto’s flexibility is in large part due to its low-latency data shuffle mechanism in conjunction with a Connector API that supports performant processing of large volumes of data. Figure 7 shows a distribution of query runtimes from production deployments of the selected use cases. We include only queries that are successful and actually read data from storage. The results demonstrate that Presto can be configured to effectively serve web use cases with Concurrent  strict Queries latency requirements (20-100ms) as well as programmatically scheduled ETL jobs that run for several hours.
+
+### C. Resource Management
+
+Presto’s integrated fine-grained resource management system allows it to quickly move CPU and memory resources between queries to maximize resource efficiency in multi-tenant clusters. Figure 8 shows a four hour trace of CPU and concurrency metrics from one of our Interactive Analytics clusters. Even as demand drops from a peak of 44 queries to a low of 8 queries, Presto continues to utilize an average of ∼90% CPU across worker nodes. It is also worth noting that the scheduler prioritizes new and inexpensive workloads as they arrive to maintain responsiveness (Section IV-F1). It does this by allocating large fractions of cluster-wide CPU to new queries within milliseconds of them being admitted.
+
+## VII. ENGINEERING LESSONS
+
+Presto has been developed and operated as a service by a small team at Facebook since 2013. We observed that some engineering philosophies had an outsize impact on Presto’s design through feedback loops in a rapidly evolving environment:
+
+### Adaptivenessover configurability: 
+
+As a complex multi-tenant query engine that executes arbitrary user defined computation, Presto must be adaptive not only to different query characteristics, but also combinations of characteristics. For example, until Presto had end-to-end adaptive backpressure (Section IV-E2), large amounts of memory and CPU was utilized by a small number of jobs with slow clients, which affected latency-sensitive  jobs  that adversely were running  (no stats)   Hive/HDFS (table/column stats) be Raptor concurrently. Hive/HDFS Without adaptiveness, it would necessary to narrowly partition workloads and tune configuration for each workload independently. That approach would not scale to the  wide variety of query shapes that we see in production.
+
+### Effortless instrumentation: 
+
+Presto exposes fine-grained performance statistics at the query and node level. We maintain our own libraries for efficient statistics collection which use flat-memory for approximate data structures. It is important to encourage `observable system design` and allow engineers to instrument the performance of their code.   Our libraries make adding statistics as easy As a consequence, the median Presto worker node exports ∼10,000 real-time performance counters, and we collect and store operator level statistics (and merge up to task and stage level) for every query. Our investment in telemetry tooling allows us to be data-driven when optimizing the system.
+
+### Static configuration: 
+
+Operational issues in a complex system like Presto are difficult to root cause and mitigate quickly. Configuration properties can affect system performance in ways that are hard to reason about, and we prioritize being able to understand the state of the cluster over the ability to
+change configuration quickly. Unlike several other systems at Facebook, Presto uses static rather than dynamic configuration wherever possible. We developed our own configuration library, which is designed to fail ‘loudly’ by crashing at startup if there are any warnings; this includes unused, duplicated, or conflicting properties. This model poses its own set of challenges. However, with a large number of clusters and configuration sets, it is more efficient to shift complexity from operational investigations to the deployment process/tooling.
+
+### Vertical integration: 
+
+Like other engineering teams, we design custom libraries for components where performance and efficiency are important. For example, custom file-format readers allow us to use Presto-native data structures end-to-end and avoid conversion overhead. However, we observed that the ability to easily debug and control library behaviors is equally important when operating a highly multi-threaded system that performs arbitrary computation in a long-lived process.
+
+Consider an example of a recent production issue. Presto uses the Java built-in gzip library. While debugging a sequence of process crashes, we found that interactions between glibc and the gzip library (which invokes native code) caused memory fragmentation. For specific workload combinations, this caused large native memory leaks. To address this, we changed the way we use the library to influence the right cache flushing behavior, but in other cases we have gone as far as writing our own libraries for compression formats. 
+
+Custom libraries can also improve developer efficiency – reducing the surface area for bugs by only implementing necessary features, unifying configuration management, and supporting detailed instrumentation to match our use case.
+
+## VIII. RELATED WORK
+
+Systems that run SQL against large data sets have become popular over the past decade. Each of these systems present a `unique set of tradeoffs`. A comprehensive examination of the  space is outside the scope of this paper. Instead, we focus on some of the more notable work in the area.
+
+Apache Hive was originally developed at Facebook to provide a SQL-like interface over data stored in HDFS, and executes queries by compiling them into MapReduce or Tez  jobs. Spark SQL is a more modern system built on the popular Spark engine , which addresses many
+of the limitations of MapReduce. Spark SQL can run large queries over multiple distributed data stores, and can operate on intermediate results in memory. However, these systems do not support end-to-end pipelining, and usually persist data to a filesystem during inter-stage shuffles. Although this improves fault tolerance, the additional latency causes such systems to be a poor fit for interactive or low-latency use cases.
+
+Products like Vertica , Teradata, Redshift, and Oracle Exadata can read external data to varying degrees. However, they are built around an internal data store and achieve peak performance when operating on data loaded into the system. Some systems take the hybrid approach of integrating RDBMS-style and MapReduce execution, such as Microsoft SQL Server Polybase  (for unstructured data) and Hadapt  (for performance). Apache Impala can provide interactive latency, but operates within the Hadoop ecosystem.In contrast, Presto is data source agnostic. Administrators can deploy Presto with a vertically-integrated data store like Raptor, but can also configure Presto to query data from a variety of systems (including relational/NoSQL databases, proprietary internal services and stream processing systems) with low overhead, even within a single Presto cluster. 
+
+Presto builds on a rich history of innovative techniques developed by the systems and database community. It uses techniques similar to those described by Neumann  and Diaconu et al.  on compiling query plans to significantly speed up query processing. It operates on compressed data where possible, using techniques from Abadi et al. , and generates compressed intermediate results. It can select the most optimal layout from multiple projections a là Vertica and C-Store  and uses strategies similar to Zhou et al.  to  minimize shuffles by reasoning about plan properties.
+
+## IX. C ONCLUSION
+
+In this paper, we presented Presto, an open-source `MPP SQL query engine` developed at Facebook to quickly process large data sets. Presto is designed to be flexible; it can be configured for high-performance SQL processing in a variety of use cases. Its rich plugin interface and Connector API make it extensible, allowing it to integrate with various data sources and be effective in many environments. The engine is also designed to be adaptive; it can take advantage of connector features to speed up execution, and can automatically tune read and write parallelism, network I/O, operator heuristics, and scheduling to the characteristics of the queries running in the system. Presto’s architecture enables it to service workloads that require very low latency and also process expensive, long-running queries efficiently.
+
+Presto allows organizations like Facebook to deploy a single  SQL system to deal with multiple common analytic use cases and easily query multiple storage systems while also scaling up to ∼1000 nodes. Its architecture and design have found a niche within the crowded SQL-on-Big-Data space. Adoption at Facebook and in the industry is growing quickly, and our open-source community continues to remain engaged.
