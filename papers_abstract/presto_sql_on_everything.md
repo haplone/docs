@@ -2,12 +2,9 @@
 
 ## Abstract
 
-Presto is an open source distributed query engine that supports much of the SQL analytics workload at Facebook.
-Presto is designed to be adaptive, flexible, and extensible. It supports a wide variety of use cases with diverse characteristics.
-These range from user-facing reporting applications with subsecond latency requirements to multi-hour ETL jobs that aggregate or join terabytes of data. 
-Presto’s Connector API allows plugins to provide a high performance I/O interface to dozens of data sources, including Hadoop data warehouses, RDBMSs, NoSQL systems, and stream processing systems. In this paper, we outline a selection of use cases that Presto supports at Facebook.
-We then describe its architecture and implementation, and call out features and performance optimizations that enable it to
-support these use cases. Finally, we present performance results that demonstrate the impact of our main design decisions.
+Presto is an open source distributed query engine that supports much of the SQL analytics workload at Facebook.Presto is designed to be adaptive, flexible, and extensible. It supports a wide variety of use cases with diverse 不同 characteristics.These range from user-facing reporting applications with subsecond latency requirements to multi-hour ETL jobs that aggregate or join terabytes of data. Presto’s Connector API allows plugins to provide a high performance I/O interface to dozens of data sources, including Hadoop data warehouses, RDBMSs, NoSQL systems, and stream processing systems. In this paper, we outline a selection of use cases that Presto supports at Facebook. We then describe its architecture and implementation, and call out features and performance optimizations that enable it to support these use cases. Finally, we present performance results that demonstrate the impact of our main design decisions.
+
+Presto 作为一个开源分布式查询引擎，支撑了Facebook大部分的SQL分析负载。Presto 以adaptive 自适应, flexible 灵活 , extensible 可扩展 为目标设计。它可以支撑非常多的不同特征的使用案例。它可以实现亚秒级的用户交互报表查询，也支持长达数小时聚合、join TB 数据的 ETL任务。有了Presto 的Connector API，我们可以提供对包括Hadoop数仓、关系数据库RDBMS、NoSql 系统、流处理系统在内的数十个数据源，高性能IO interface。本论文，我们首先前调了Facebook 的 Presto 使用案例。我们也描述了Presto 的架构、实现方式，包括为了支撑案例实现的features 特性 和性能优化。最后，我们使用性能数据证明我们的整体设计决策的正确性。
 
 Index Terms—SQL, query engine, big data, data warehouse
 
@@ -15,14 +12,13 @@ Index Terms—SQL, query engine, big data, data warehouse
 
 The ability to quickly and easily extract insights from large amounts of data is increasingly important to technology-enabled organizations. As it becomes cheaper to collect and store vast amounts of data, it is important that tools to query this data become faster, easier to use, and more flexible.  Using a popular query language like SQL can make data analytics accessible to more people within an organization.  However, ease-of-use is compromised when organizations are forced to deploy multiple incompatible SQL-like systems to solve different classes of analytics problems. 
 
-Presto is an open-source distributed SQL query engine that has run in production at Facebook since 2013 and is used today
-by several large companies, including Uber, Netflix, Airbnb, Bloomberg, and LinkedIn. Organizations such as Qubole, Treasure Data, and Starburst Data have commercial offerings based on Presto. The Amazon Athena  interactive querying service is built on Presto. With over a hundred contributors on GitHub, Presto has a strong open source community.
+Presto is an open-source distributed SQL query engine that has run in production at Facebook since 2013 and is used today by several large companies, including Uber, Netflix, Airbnb, Bloomberg, and LinkedIn. Organizations such as Qubole, Treasure Data, and Starburst Data have commercial offerings based on Presto. The Amazon Athena  interactive querying service is built on Presto. With over a hundred contributors on GitHub, Presto has a strong open source community.
 
 Presto is designed to be adaptive, flexible, and extensible. It provides an ANSI SQL interface to query data stored in Hadoop environments, open-source and proprietary RDBMSs, NoSQL systems, and stream processing systems such as Kafka. A ‘Generic RPC’   connector makes adding a SQL interface to proprietary systems as easy as implementing a half dozen RPC endpoints. Presto exposes an open HTTP API, ships with JDBC support, and is compatible with several industry-standard business intelligence (BI) and query authoring tools. `The built-in Hive connector can natively read from and write to distributed file systems such as HDFS and Amazon S3; and supports several popular open-source file formats including ORC, Parquet, and Avro.`
 
 As of late 2018, Presto is responsible for supporting much of the SQL analytic workload at Facebook, including interactive/BI queries and long-running batch extract-transform-load (ETL) jobs. In addition, Presto powers several end-user facing analytics tools, serves high performance dashboards, provides a SQL interface to multiple internal NoSQL systems, and supports Facebook’s A/B testing infrastructure. In aggregate, Presto processes hundreds of petabytes of data and quadrillions of rows per day at Facebook.
 
-Presto has several notable characteristics:
+Presto has several notable 显著 characteristics:
 
 • It is an adaptive `multi-tenant system` capable of concurrently running hundreds of memory, I/O, and CPU-intensive queries, and scaling to thousands of worker nodes while efficiently utilizing cluster resources.
 
